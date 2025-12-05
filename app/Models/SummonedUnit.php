@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SummonedUnit extends Model
 {
@@ -20,6 +21,7 @@ class SummonedUnit extends Model
         'defense',
         'speed',
         'passive_ability',
+        'source',
     ];
 
     public function user(): BelongsTo
@@ -37,5 +39,10 @@ class SummonedUnit extends Model
         return $this->belongsToMany(Team::class, 'team_units')
             ->withPivot('position')
             ->withTimestamps();
+    }
+
+    public function evolutionRuleForCurrentTier(): HasOne
+    {
+        return $this->hasOne(EvolutionRule::class, 'from_tier', 'tier');
     }
 }

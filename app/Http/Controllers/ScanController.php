@@ -26,6 +26,12 @@ class ScanController extends Controller
 
     public function store(Request $request)
     {
+        // Remove all whitespace (leading, trailing, internal)
+        $cleanedUpc = preg_replace('/\s+/', '', (string) $request->input('upc', ''));
+        $request->merge([
+            'upc' => $cleanedUpc,
+        ]);
+
         $validated = $request->validate([
             'upc' => ['required', 'string', 'min:8', 'max:20', 'regex:/^[0-9]+$/'],
         ], [

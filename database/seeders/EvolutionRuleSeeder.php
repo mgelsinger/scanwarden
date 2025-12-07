@@ -46,7 +46,13 @@ class EvolutionRuleSeeder extends Seeder
         ];
 
         foreach ($rules as $rule) {
-            EvolutionRule::create($rule);
+            EvolutionRule::firstOrCreate(
+                [
+                    'from_tier' => $rule['from_tier'],
+                    'to_tier' => $rule['to_tier'],
+                ],
+                $rule
+            );
         }
     }
 }

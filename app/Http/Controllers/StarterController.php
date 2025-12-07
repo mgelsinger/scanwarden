@@ -90,10 +90,15 @@ class StarterController extends Controller
             ]);
 
             // Grant some initial sector energy
-            $user->sectorEnergies()->updateOrCreate(
-                ['sector_id' => $sector->id],
-                ['current_energy' => DB::raw('current_energy + 50')]
-            );
+            $energyRecord = $user->sectorEnergies()->where('sector_id', $sector->id)->first();
+            if ($energyRecord) {
+                $energyRecord->increment('current_energy', 50);
+            } else {
+                $user->sectorEnergies()->create([
+                    'sector_id' => $sector->id,
+                    'current_energy' => 50
+                ]);
+            }
 
             DB::commit();
 

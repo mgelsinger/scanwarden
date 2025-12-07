@@ -42,10 +42,7 @@ class TeamsController extends Controller
 
     public function show(Team $team): View
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('view', $team);
 
         $team->load(['units.sector']);
 
@@ -62,20 +59,25 @@ class TeamsController extends Controller
 
     public function edit(Team $team): View
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $team);
 
-        return view('teams.edit', compact('team'));
+        $team->load(['units.sector']);
+
+        // Get available units (units not in any team)
+        $availableUnits = auth()->user()->summonedUnits()
+            ->whereDoesntHave('teams')
+            ->orWhereHas('teams', function($query) use ($team) {
+                $query->where('team_id', '!=', $team->id);
+            })
+            ->with('sector')
+            ->get();
+
+        return view('teams.edit', compact('team', 'availableUnits'));
     }
 
     public function update(Request $request, Team $team)
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $team);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -90,10 +92,7 @@ class TeamsController extends Controller
 
     public function destroy(Team $team)
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('delete', $team);
 
         $team->delete();
 
@@ -104,10 +103,7 @@ class TeamsController extends Controller
 
     public function addUnit(Request $request, Team $team)
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorize('update', $team);
 
         $validated = $request->validate([
             'unit_id' => ['required', 'exists:summoned_units,id'],
@@ -117,7 +113,7 @@ class TeamsController extends Controller
 
         // Verify unit ownership
         if ($unit->user_id !== auth()->id()) {
-            abort(403);
+            abort(403, 'You can only add your own units to teams.');
         }
 
         // Check team size limit
@@ -135,19 +131,29 @@ class TeamsController extends Controller
             return back()->withErrors(['error' => 'Unit is already assigned to another team.']);
         }
 
-        $team->units()->attach($unit->id);
+        // Attach unit to team with position
+        $team->units()->attach($unit->id, [
+            'position' => $team->units()->count() + 1,
+        ]);
 
         return back()->with('success', "{$unit->name} added to team!");
     }
 
     public function removeUnit(Team $team, SummonedUnit $unit)
     {
-        // Authorization check
-        if ($team->user_id !== auth()->id() || $unit->user_id !== auth()->id()) {
-            abort(403);
+        $this->authorize('update', $team);
+
+        // Verify unit ownership
+        if ($unit->user_id !== auth()->id()) {
+            abort(403, 'You can only remove your own units from teams.');
         }
 
         $team->units()->detach($unit->id);
+
+        // Reorder positions
+        $team->units()->get()->each(function($u, $index) use ($team) {
+            $team->units()->updateExistingPivot($u->id, ['position' => $index + 1]);
+        });
 
         return back()->with('success', "{$unit->name} removed from team!");
     }

@@ -6,6 +6,8 @@ use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\LoreController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ScanController;
+use App\Http\Controllers\ScanHistoryController;
+use App\Http\Controllers\StarterController;
 use App\Http\Controllers\TeamsController;
 use App\Http\Controllers\UnitsController;
 use Illuminate\Support\Facades\Route;
@@ -17,11 +19,17 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// Starter selection routes (authenticated but before starter check)
+Route::middleware('auth')->group(function () {
+    Route::get('/starter', [StarterController::class, 'index'])->name('starter.index');
+    Route::post('/starter', [StarterController::class, 'store'])->name('starter.store');
+});
+
 Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'starter.selected'])
     ->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'starter.selected'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -30,6 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/scan', [ScanController::class, 'create'])->name('scan.create');
     Route::post('/scan', [ScanController::class, 'store'])->name('scan.store');
     Route::get('/scan/{scanRecord}', [ScanController::class, 'result'])->name('scan.result');
+    Route::get('/scan-history', [ScanHistoryController::class, 'index'])->name('scan-history.index');
 
     // Units routes
     Route::get('/units', [UnitsController::class, 'index'])->name('units.index');
@@ -60,6 +69,10 @@ Route::middleware('auth')->group(function () {
     // Lore routes
     Route::get('/lore', [LoreController::class, 'index'])->name('lore.index');
     Route::get('/lore/{lore}', [LoreController::class, 'show'])->name('lore.show');
+
+    // Transmuter routes
+    Route::get('/transmuter', [App\Http\Controllers\TransmuterController::class, 'index'])->name('transmuter.index');
+    Route::post('/transmuter/{recipe}', [App\Http\Controllers\TransmuterController::class, 'transmute'])->name('transmuter.transmute');
 });
 
 require __DIR__.'/auth.php';

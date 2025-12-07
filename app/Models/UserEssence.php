@@ -2,26 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ScanRecord extends Model
+class UserEssence extends Model
 {
-    use HasFactory;
+    protected $table = 'user_essence';
+
     protected $fillable = [
         'user_id',
-        'raw_upc',
         'sector_id',
-        'rewards',
+        'amount',
+        'type',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'rewards' => 'array',
-        ];
-    }
 
     public function user(): BelongsTo
     {

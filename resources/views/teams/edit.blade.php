@@ -57,6 +57,93 @@
                 </div>
             </div>
 
+            <!-- Team Builder -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold mb-4">Team Builder ({{ $team->units->count() }}/5)</h3>
+
+                    <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
+                        <div class="bg-blue-600 h-2 rounded-full transition-all"
+                             style="width: {{ ($team->units->count() / 5) * 100 }}%"></div>
+                    </div>
+
+                    @if ($team->units->isNotEmpty())
+                        <div class="mb-6">
+                            <h4 class="font-semibold text-sm text-gray-700 mb-3">Current Units</h4>
+                            <div class="space-y-2">
+                                @foreach ($team->units as $unit)
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <div class="flex items-center gap-3">
+                                            <div>
+                                                <div class="font-bold">{{ $unit->name }}</div>
+                                                <div class="flex gap-2 mt-1">
+                                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold"
+                                                          style="background-color: {{ $unit->sector->color }}20; color: {{ $unit->sector->color }};">
+                                                        {{ $unit->sector->name }}
+                                                    </span>
+                                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white"
+                                                          style="background-color: {{ config('rarities.tiers.' . $unit->rarity . '.color') }};">
+                                                        {{ config('rarities.tiers.' . $unit->rarity . '.name') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <form method="POST" action="{{ route('teams.removeUnit', [$team, $unit]) }}" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-600 hover:text-red-800 text-sm font-semibold">
+                                                Remove
+                                            </button>
+                                        </form>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    @if ($availableUnits->isNotEmpty() && $team->units->count() < 5)
+                        <div>
+                            <h4 class="font-semibold text-sm text-gray-700 mb-3">Add Units</h4>
+                            <div class="space-y-2">
+                                @foreach ($availableUnits as $unit)
+                                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
+                                        <div class="flex items-center gap-3">
+                                            <div>
+                                                <div class="font-bold">{{ $unit->name }}</div>
+                                                <div class="flex gap-2 mt-1">
+                                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold"
+                                                          style="background-color: {{ $unit->sector->color }}20; color: {{ $unit->sector->color }};">
+                                                        {{ $unit->sector->name }}
+                                                    </span>
+                                                    <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white"
+                                                          style="background-color: {{ config('rarities.tiers.' . $unit->rarity . '.color') }};">
+                                                        {{ config('rarities.tiers.' . $unit->rarity . '.name') }}
+                                                    </span>
+                                                    <span class="text-xs text-gray-600">
+                                                        HP: {{ $unit->hp }} | ATK: {{ $unit->attack }} | DEF: {{ $unit->defense }} | SPD: {{ $unit->speed }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <form method="POST" action="{{ route('teams.addUnit', $team) }}" class="inline">
+                                            @csrf
+                                            <input type="hidden" name="unit_id" value="{{ $unit->id }}">
+                                            <button type="submit" class="px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700">
+                                                Add
+                                            </button>
+                                        </form>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @elseif ($team->units->count() >= 5)
+                        <p class="text-sm text-gray-600 italic">Team is full. Remove a unit to add a different one.</p>
+                    @else
+                        <p class="text-sm text-gray-600 italic">No available units. All your units are assigned to teams.</p>
+                    @endif
+                </div>
+            </div>
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     <h3 class="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>

@@ -22,13 +22,6 @@ class UnitSummoningService
         'Keeper', 'Defender', 'Spirit', 'Entity', 'Being', 'Construct', 'Familiar'
     ];
 
-    private array $rarities = [
-        'common' => ['weight' => 60, 'stat_mult' => 1.0],
-        'uncommon' => ['weight' => 25, 'stat_mult' => 1.3],
-        'rare' => ['weight' => 10, 'stat_mult' => 1.7],
-        'epic' => ['weight' => 4, 'stat_mult' => 2.2],
-        'legendary' => ['weight' => 1, 'stat_mult' => 3.0],
-    ];
 
     public function summonUnit(User $user, Sector $sector, string $upcSeed): SummonedUnit
     {
@@ -46,7 +39,7 @@ class UnitSummoningService
         $baseStats = $this->generateBaseStats();
 
         // Apply rarity multiplier
-        $rarityMult = $this->rarities[$rarity]['stat_mult'];
+        $stats = $this->applyRarityMultiplier($baseStats, $rarity);
 
         $unit = SummonedUnit::create([
             'user_id' => $user->id,
@@ -55,10 +48,10 @@ class UnitSummoningService
             'rarity' => $rarity,
             'tier' => 1,
             'evolution_level' => 0,
-            'hp' => (int)($baseStats['hp'] * $rarityMult),
-            'attack' => (int)($baseStats['attack'] * $rarityMult),
-            'defense' => (int)($baseStats['defense'] * $rarityMult),
-            'speed' => (int)($baseStats['speed'] * $rarityMult),
+            'hp' => $stats['hp'],
+            'attack' => $stats['attack'],
+            'defense' => $stats['defense'],
+            'speed' => $stats['speed'],
             'passive_ability' => $this->generatePassiveAbility($sector, $rarity),
         ]);
 
@@ -68,20 +61,32 @@ class UnitSummoningService
         return $unit;
     }
 
-    private function determineRarity(): string
+    public function determineRarity(): string
     {
-        $totalWeight = array_sum(array_column($this->rarities, 'weight'));
-        $random = rand(1, $totalWeight);
+        $rarities = config('rarities.tiers');
+        $rand = rand(1, 100);
 
-        $currentWeight = 0;
-        foreach ($this->rarities as $rarity => $data) {
-            $currentWeight += $data['weight'];
-            if ($random <= $currentWeight) {
-                return $rarity;
+        $cumulativeProbability = 0;
+        foreach ($rarities as $key => $rarity) {
+            $cumulativeProbability += $rarity['probability'];
+            if ($rand <= $cumulativeProbability) {
+                return $key;
             }
         }
 
-        return 'common';
+        return 'common'; // fallback
+    }
+
+    public function applyRarityMultiplier(array $baseStats, string $rarity): array
+    {
+        $multiplier = config("rarities.tiers.{$rarity}.stat_multiplier", 1.0);
+
+        return [
+            'hp' => (int) round($baseStats['hp'] * $multiplier),
+            'attack' => (int) round($baseStats['attack'] * $multiplier),
+            'defense' => (int) round($baseStats['defense'] * $multiplier),
+            'speed' => (int) round($baseStats['speed'] * $multiplier),
+        ];
     }
 
     private function generateName(Sector $sector): string
@@ -119,6 +124,42 @@ class UnitSummoningService
         }
 
         return $abilities[$sector->name] ?? null;
+    }
+
+    public function summonUnitWithRarity(User $user, Sector $sector, string $upcSeed, string $rarity): SummonedUnit
+    {
+        // Use UPC as seed for deterministic randomness
+        $seed = crc32($upcSeed . $user->id . time());
+        srand($seed);
+
+        // Generate name
+        $name = $this->generateName($sector);
+
+        // Generate base stats
+        $baseStats = $this->generateBaseStats();
+
+        // Apply rarity multiplier
+        $stats = $this->applyRarityMultiplier($baseStats, $rarity);
+
+        $unit = SummonedUnit::create([
+            'user_id' => $user->id,
+            'sector_id' => $sector->id,
+            'name' => $name,
+            'rarity' => $rarity,
+            'tier' => 1,
+            'evolution_level' => 0,
+            'hp' => $stats['hp'],
+            'attack' => $stats['attack'],
+            'defense' => $stats['defense'],
+            'speed' => $stats['speed'],
+            'passive_ability' => $this->generatePassiveAbility($sector, $rarity),
+            'source' => 'transmutation',
+        ]);
+
+        // Reset random seed
+        srand();
+
+        return $unit;
     }
 
     public function getUnitSummary(SummonedUnit $unit): array

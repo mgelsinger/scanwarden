@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -62,6 +63,11 @@ class User extends Authenticatable
     public function sectorEnergies(): HasMany
     {
         return $this->hasMany(SectorEnergy::class);
+    }
+
+    public function essence(): HasMany
+    {
+        return $this->hasMany(UserEssence::class);
     }
 
     public function scanRecords(): HasMany

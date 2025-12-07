@@ -36,14 +36,9 @@
                                             style="background-color: {{ $unit->sector->color }}20; color: {{ $unit->sector->color }};">
                                             {{ $unit->sector->name }}
                                         </span>
-                                        <span class="inline-block px-3 py-1 rounded text-sm font-semibold
-                                            @if($unit->rarity === 'legendary') bg-yellow-200 text-yellow-900
-                                            @elseif($unit->rarity === 'epic') bg-purple-200 text-purple-900
-                                            @elseif($unit->rarity === 'rare') bg-blue-200 text-blue-900
-                                            @elseif($unit->rarity === 'uncommon') bg-green-200 text-green-900
-                                            @else bg-gray-200 text-gray-900
-                                            @endif">
-                                            {{ ucfirst($unit->rarity) }}
+                                        <span class="inline-block px-3 py-1 rounded text-sm font-semibold text-white"
+                                            style="background-color: {{ config('rarities.tiers.' . $unit->rarity . '.color') }};">
+                                            {{ config('rarities.tiers.' . $unit->rarity . '.name') }}
                                         </span>
                                     </div>
                                 </div>

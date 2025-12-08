@@ -24,6 +24,12 @@
                     <x-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
                         {{ __('Teams') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('transmuter.index')" :active="request()->routeIs('transmuter.*')">
+                        {{ __('Transmuter') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('scan-history.index')" :active="request()->routeIs('scan-history.*')">
+                        {{ __('History') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('battles.index')" :active="request()->routeIs('battles.*')">
                         {{ __('Battles') }}
                     </x-nav-link>
@@ -96,6 +102,12 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('teams.index')" :active="request()->routeIs('teams.*')">
                 {{ __('Teams') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('transmuter.index')" :active="request()->routeIs('transmuter.*')">
+                {{ __('Transmuter') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('scan-history.index')" :active="request()->routeIs('scan-history.*')">
+                {{ __('History') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('battles.index')" :active="request()->routeIs('battles.*')">
                 {{ __('Battles') }}

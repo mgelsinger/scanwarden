@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\ScanRecord;
 use App\Models\SectorEnergy;
+use App\Models\UserEssence;
+use App\Services\EssenceGenerationService;
 use App\Services\LoreService;
 use App\Services\ScanClassificationService;
 use App\Services\UnitSummoningService;
@@ -16,7 +18,8 @@ class ScanController extends Controller
     public function __construct(
         private ScanClassificationService $classificationService,
         private UnitSummoningService $summoningService,
-        private LoreService $loreService
+        private LoreService $loreService,
+        private EssenceGenerationService $essenceService
     ) {}
 
     public function create(): View
@@ -76,12 +79,24 @@ class ScanController extends Controller
                 $summonedUnitData = $this->summoningService->getUnitSummary($summonedUnit);
             }
 
+            // Generate and award essence
+            $essenceRewards = $this->essenceService->generateEssenceForScan($user, $sector, $shouldSummon);
+            foreach ($essenceRewards as $essenceReward) {
+                UserEssence::addEssence(
+                    $user->id,
+                    $essenceReward['amount'],
+                    $essenceReward['type'],
+                    $essenceReward['sector_id'] ?? null
+                );
+            }
+
             // Prepare rewards
             $rewards = [
                 'energy_gained' => $energyGain,
                 'sector_name' => $sector->name,
                 'should_summon' => $shouldSummon,
                 'summoned_unit' => $summonedUnitData,
+                'essence_rewards' => $essenceRewards,
             ];
 
             // Create scan record

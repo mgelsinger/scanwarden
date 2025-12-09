@@ -88,15 +88,23 @@
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm text-gray-900">
-                                                @if($scan->rewards['unit_summoned'] ?? false)
+                                                @if($scan->rewards['unit_summoned'] ?? $scan->rewards['should_summon'] ?? false)
                                                     <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                                         ✓ Unit Summoned
                                                     </span>
                                                 @endif
                                             </div>
                                             <div class="text-xs text-gray-500 mt-1">
-                                                +{{ $scan->rewards['energy'] ?? 0 }} Energy
+                                                +{{ $scan->rewards['energy'] ?? $scan->rewards['energy_gained'] ?? 0 }} Energy
                                             </div>
+                                            @if (!empty($scan->rewards['essence_rewards']))
+                                                <div class="text-xs text-purple-600 mt-1">
+                                                    @php
+                                                        $totalEssence = array_sum(array_column($scan->rewards['essence_rewards'], 'amount'));
+                                                    @endphp
+                                                    +{{ $totalEssence }} Essence
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <a href="{{ route('scan.result', $scan) }}" class="text-indigo-600 hover:text-indigo-900">

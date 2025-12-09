@@ -47,6 +47,21 @@
                                         No unit summoned this time. Keep scanning!
                                     </li>
                                 @endif
+
+                                @if (!empty($rewards['essence_rewards']))
+                                    @foreach ($rewards['essence_rewards'] as $essenceReward)
+                                        <li class="text-purple-600 font-semibold">
+                                            +{{ $essenceReward['amount'] }}
+                                            @if ($essenceReward['type'] === 'generic')
+                                                Generic Essence
+                                            @elseif ($essenceReward['type'] === 'sector')
+                                                {{ $essenceReward['sector_name'] ?? 'Sector' }} Essence
+                                            @elseif ($essenceReward['type'] === 'summon_bonus')
+                                                Bonus Essence (Summon!)
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                @endif
                             </ul>
                         </div>
 

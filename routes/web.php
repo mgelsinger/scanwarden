@@ -10,6 +10,7 @@ use App\Http\Controllers\ScanController;
 use App\Http\Controllers\ScanHistoryController;
 use App\Http\Controllers\StarterController;
 use App\Http\Controllers\TeamsController;
+use App\Http\Controllers\TowerController;
 use App\Http\Controllers\UnitsController;
 use Illuminate\Support\Facades\Route;
 
@@ -82,6 +83,11 @@ Route::middleware(['auth', 'starter.selected'])->group(function () {
 
     // Quest routes
     Route::get('/quests', [QuestController::class, 'index'])->name('quests.index');
+
+    // Tower routes
+    Route::get('/towers', [TowerController::class, 'index'])->name('towers.index');
+    Route::get('/towers/{tower}', [TowerController::class, 'show'])->name('towers.show');
+    Route::post('/towers/{tower}/fight/{floor}', [TowerController::class, 'fight'])->name('towers.fight');
 });
 
 require __DIR__.'/auth.php';

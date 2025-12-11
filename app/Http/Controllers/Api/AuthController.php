@@ -24,7 +24,7 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $user->createToken('mobile-client', ['mobile'])->plainTextToken;
 
         return response()->json([
             'user' => $user,
@@ -47,7 +47,7 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('api-token')->plainTextToken;
+        $token = $user->createToken('mobile-client', ['mobile'])->plainTextToken;
 
         return response()->json([
             'user' => $user,

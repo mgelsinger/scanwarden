@@ -36,7 +36,8 @@ class TeamController extends Controller
     {
         if ($team->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This team does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
@@ -47,7 +48,8 @@ class TeamController extends Controller
     {
         if ($team->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This team does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
@@ -64,7 +66,8 @@ class TeamController extends Controller
     {
         if ($team->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This team does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
@@ -79,7 +82,8 @@ class TeamController extends Controller
     {
         if ($team->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This team does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
@@ -91,7 +95,8 @@ class TeamController extends Controller
 
         if ($unit->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This unit does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
@@ -112,13 +117,15 @@ class TeamController extends Controller
     {
         if ($team->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This team does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 
         if ($unit->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This unit does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 

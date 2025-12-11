@@ -182,4 +182,56 @@ class ResourceService
 
         return $energy && $energy->current_energy >= $amount;
     }
+
+    /**
+     * Grant resources to a user based on a rewards array.
+     * Returns array of granted rewards for display.
+     *
+     * @param User $user
+     * @param array $rewards Array of reward definitions: [['type' => 'essence', 'essence_type' => 'generic', 'amount' => 30], ...]
+     * @return array Granted rewards with details
+     */
+    public function grantResources(User $user, array $rewards): array
+    {
+        $granted = [];
+
+        foreach ($rewards as $reward) {
+            $type = $reward['type'] ?? null;
+            $amount = $reward['amount'] ?? 0;
+
+            if (!$type || $amount <= 0) {
+                continue;
+            }
+
+            if ($type === 'essence') {
+                $essenceType = $reward['essence_type'] ?? null;
+
+                if ($essenceType === 'generic') {
+                    $this->grantGenericEssence($user, $amount);
+                    $granted[] = [
+                        'type' => 'essence',
+                        'essence_type' => 'generic',
+                        'amount' => $amount,
+                    ];
+                } elseif ($essenceType === 'sector' && isset($reward['sector_id'])) {
+                    $this->grantSectorEssence($user, $reward['sector_id'], $amount);
+                    $granted[] = [
+                        'type' => 'essence',
+                        'essence_type' => 'sector',
+                        'sector_id' => $reward['sector_id'],
+                        'amount' => $amount,
+                    ];
+                }
+            } elseif ($type === 'sector_energy' && isset($reward['sector_id'])) {
+                $this->grantSectorEnergy($user, $reward['sector_id'], $amount);
+                $granted[] = [
+                    'type' => 'sector_energy',
+                    'sector_id' => $reward['sector_id'],
+                    'amount' => $amount,
+                ];
+            }
+        }
+
+        return $granted;
+    }
 }

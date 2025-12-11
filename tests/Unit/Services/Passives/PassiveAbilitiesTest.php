@@ -20,7 +20,8 @@ class PassiveAbilitiesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->sector = Sector::factory()->create(['name' => 'Tech Sector']);
+        $this->seed(\Database\Seeders\SectorSeeder::class);
+        $this->sector = Sector::where('name', 'Tech Sector')->first();
     }
 
     /** @test */
@@ -250,9 +251,9 @@ class PassiveAbilitiesTest extends TestCase
         // Trigger battle start
         $passive->onBattleStart($battleState, 'attacker_1');
 
-        // Check multipliers stack correctly
-        $this->assertEquals(1.32, $battleState['units']['attacker_1']['stats']['damage_out_multiplier']);
-        $this->assertEquals(0.72, $battleState['units']['attacker_1']['stats']['damage_in_multiplier']);
+        // Check multipliers stack correctly (using delta for floating point comparison)
+        $this->assertEqualsWithDelta(1.32, $battleState['units']['attacker_1']['stats']['damage_out_multiplier'], 0.001);
+        $this->assertEqualsWithDelta(0.72, $battleState['units']['attacker_1']['stats']['damage_in_multiplier'], 0.001);
     }
 
     /** @test */

@@ -23,11 +23,12 @@ class PassiveEngineTest extends TestCase
         parent::setUp();
         $this->engine = new PassiveEngine();
 
-        // Create sectors for testing
-        $this->techSector = Sector::factory()->create(['name' => 'Tech Sector']);
-        $this->bioSector = Sector::factory()->create(['name' => 'Bio Sector']);
-        $this->arcaneSector = Sector::factory()->create(['name' => 'Arcane Sector']);
-        $this->foodSector = Sector::factory()->create(['name' => 'Food Sector']);
+        // Get seeded sectors
+        $this->seed(\Database\Seeders\SectorSeeder::class);
+        $this->techSector = Sector::where('name', 'Tech Sector')->first();
+        $this->bioSector = Sector::where('name', 'Bio Sector')->first();
+        $this->arcaneSector = Sector::where('name', 'Arcane Sector')->first();
+        $this->foodSector = Sector::where('name', 'Food Sector')->first();
     }
 
     /** @test */

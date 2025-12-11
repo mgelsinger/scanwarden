@@ -18,7 +18,8 @@ class BioRegeneration implements PassiveAbilityInterface
 
     public function appliesTo(SummonedUnit $unit): bool
     {
-        return true;
+        // This passive applies to all non-common units
+        return $unit->rarity !== 'common';
     }
 
     public function onBattleStart(array &$battleState, string $unitId): void

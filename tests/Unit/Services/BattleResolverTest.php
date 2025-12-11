@@ -193,7 +193,8 @@ class BattleResolverTest extends TestCase
     public function tech_overclock_passive_increases_first_attack_damage()
     {
         $user = User::factory()->create();
-        $techSector = Sector::factory()->create(['name' => 'Tech Sector']);
+        $this->seed(\Database\Seeders\SectorSeeder::class);
+        $techSector = Sector::where('name', 'Tech Sector')->first();
 
         // Create Tech unit with overclock passive
         $techUnit = SummonedUnit::factory()->create([
@@ -207,6 +208,9 @@ class BattleResolverTest extends TestCase
             'passive_key' => 'tech_overclock',
         ]);
 
+        $techTeam = Team::factory()->create(['user_id' => $user->id]);
+        $techTeam->units()->attach($techUnit->id, ['position' => 1]);
+
         // Create regular unit without passive for comparison
         $regularUnit = SummonedUnit::factory()->create([
             'user_id' => $user->id,
@@ -219,17 +223,20 @@ class BattleResolverTest extends TestCase
             'passive_key' => null,
         ]);
 
+        $regularTeam = Team::factory()->create(['user_id' => $user->id]);
+        $regularTeam->units()->attach($regularUnit->id, ['position' => 1]);
+
         // Both attack same dummy target
         $defenderUnits = [
             ['id' => 99, 'name' => 'Target', 'hp' => 200, 'attack' => 5, 'defense' => 10, 'speed' => 5],
         ];
 
         // Battle with Tech unit
-        $techResult = $this->resolver->resolveBattle([$techUnit], $defenderUnits);
+        $techResult = $this->resolver->resolveBattle($techTeam, $defenderUnits);
         $techFirstDamage = $techResult['turns'][0]['damage'];
 
         // Battle with regular unit
-        $regularResult = $this->resolver->resolveBattle([$regularUnit], $defenderUnits);
+        $regularResult = $this->resolver->resolveBattle($regularTeam, $defenderUnits);
         $regularFirstDamage = $regularResult['turns'][0]['damage'];
 
         // Tech unit's first attack should deal 20% more damage
@@ -249,7 +256,7 @@ class BattleResolverTest extends TestCase
     public function bio_regeneration_passive_helps_unit_survive_longer()
     {
         $user = User::factory()->create();
-        $bioSector = Sector::factory()->create(['name' => 'Bio Sector']);
+        $bioSector = Sector::where('name', 'Bio Sector')->first();
 
         // Create Bio unit with regeneration passive
         $bioUnit = SummonedUnit::factory()->create([
@@ -263,6 +270,9 @@ class BattleResolverTest extends TestCase
             'passive_key' => 'bio_regeneration',
         ]);
 
+        $bioTeam = Team::factory()->create(['user_id' => $user->id]);
+        $bioTeam->units()->attach($bioUnit->id, ['position' => 1]);
+
         // Create regular unit without passive
         $regularUnit = SummonedUnit::factory()->create([
             'user_id' => $user->id,
@@ -275,17 +285,20 @@ class BattleResolverTest extends TestCase
             'passive_key' => null,
         ]);
 
+        $regularTeam = Team::factory()->create(['user_id' => $user->id]);
+        $regularTeam->units()->attach($regularUnit->id, ['position' => 1]);
+
         // Both face same aggressive opponent
         $attackerUnits = [
             ['id' => 99, 'name' => 'Aggressor', 'hp' => 300, 'attack' => 25, 'defense' => 10, 'speed' => 15],
         ];
 
         // Battle with Bio unit
-        $bioResult = $this->resolver->resolveBattle($attackerUnits, [$bioUnit]);
+        $bioResult = $this->resolver->resolveBattle($attackerUnits, $bioTeam);
         $bioTotalTurns = $bioResult['total_turns'];
 
         // Battle with regular unit
-        $regularResult = $this->resolver->resolveBattle($attackerUnits, [$regularUnit]);
+        $regularResult = $this->resolver->resolveBattle($attackerUnits, $regularTeam);
         $regularTotalTurns = $regularResult['total_turns'];
 
         // Bio unit should survive more turns due to healing
@@ -298,7 +311,7 @@ class BattleResolverTest extends TestCase
     public function legendary_aura_passive_reduces_damage_taken()
     {
         $user = User::factory()->create();
-        $sector = Sector::factory()->create(['name' => 'Tech Sector']);
+        $sector = Sector::where('name', 'Tech Sector')->first();
 
         // Create legendary unit with aura
         $legendaryUnit = SummonedUnit::factory()->create([
@@ -312,6 +325,9 @@ class BattleResolverTest extends TestCase
             'passive_key' => 'tech_overclock',
         ]);
 
+        $legendaryTeam = Team::factory()->create(['user_id' => $user->id]);
+        $legendaryTeam->units()->attach($legendaryUnit->id, ['position' => 1]);
+
         // Create regular unit
         $regularUnit = SummonedUnit::factory()->create([
             'user_id' => $user->id,
@@ -324,13 +340,16 @@ class BattleResolverTest extends TestCase
             'passive_key' => null,
         ]);
 
+        $regularTeam = Team::factory()->create(['user_id' => $user->id]);
+        $regularTeam->units()->attach($regularUnit->id, ['position' => 1]);
+
         // Both attacked by same strong unit
         $attackerUnits = [
             ['id' => 99, 'name' => 'Attacker', 'hp' => 200, 'attack' => 30, 'defense' => 10, 'speed' => 20],
         ];
 
         // Battle with legendary unit (legendary takes damage second due to lower speed)
-        $legendaryResult = $this->resolver->resolveBattle($attackerUnits, [$legendaryUnit]);
+        $legendaryResult = $this->resolver->resolveBattle($attackerUnits, $legendaryTeam);
         // Find turn where legendary unit takes damage
         $legendaryDamageTaken = null;
         foreach ($legendaryResult['turns'] as $turn) {
@@ -341,7 +360,7 @@ class BattleResolverTest extends TestCase
         }
 
         // Battle with regular unit
-        $regularResult = $this->resolver->resolveBattle($attackerUnits, [$regularUnit]);
+        $regularResult = $this->resolver->resolveBattle($attackerUnits, $regularTeam);
         // Find turn where regular unit takes damage
         $regularDamageTaken = null;
         foreach ($regularResult['turns'] as $turn) {
@@ -362,7 +381,7 @@ class BattleResolverTest extends TestCase
     public function legendary_aura_passive_increases_damage_dealt()
     {
         $user = User::factory()->create();
-        $sector = Sector::factory()->create(['name' => 'Tech Sector']);
+        $sector = Sector::where('name', 'Tech Sector')->first();
 
         // Create legendary unit
         $legendaryUnit = SummonedUnit::factory()->create([
@@ -376,6 +395,9 @@ class BattleResolverTest extends TestCase
             'passive_key' => 'tech_overclock',
         ]);
 
+        $legendaryTeam = Team::factory()->create(['user_id' => $user->id]);
+        $legendaryTeam->units()->attach($legendaryUnit->id, ['position' => 1]);
+
         // Create regular unit
         $regularUnit = SummonedUnit::factory()->create([
             'user_id' => $user->id,
@@ -388,19 +410,22 @@ class BattleResolverTest extends TestCase
             'passive_key' => null,
         ]);
 
+        $regularTeam = Team::factory()->create(['user_id' => $user->id]);
+        $regularTeam->units()->attach($regularUnit->id, ['position' => 1]);
+
         // Both attack same target
         $defenderUnits = [
             ['id' => 99, 'name' => 'Target', 'hp' => 200, 'attack' => 5, 'defense' => 10, 'speed' => 5],
         ];
 
         // Battle with legendary unit
-        $legendaryResult = $this->resolver->resolveBattle([$legendaryUnit], $defenderUnits);
+        $legendaryResult = $this->resolver->resolveBattle($legendaryTeam, $defenderUnits);
         // First turn is legendary attack (due to tech overclock), second turn is legendary again
         // We want the second attack to isolate legendary_aura effect without overclock
         $legendarySecondDamage = $legendaryResult['turns'][2]['damage'] ?? null;
 
         // Battle with regular unit
-        $regularResult = $this->resolver->resolveBattle([$regularUnit], $defenderUnits);
+        $regularResult = $this->resolver->resolveBattle($regularTeam, $defenderUnits);
         $regularFirstDamage = $regularResult['turns'][0]['damage'];
 
         // Note: Legendary's first attack has BOTH overclock (1.20) and aura (1.10)
@@ -422,7 +447,7 @@ class BattleResolverTest extends TestCase
     public function arcane_surge_passive_increases_speed_for_first_three_turns()
     {
         $user = User::factory()->create();
-        $arcaneSector = Sector::factory()->create(['name' => 'Arcane Sector']);
+        $arcaneSector = Sector::where('name', 'Arcane Sector')->first();
 
         // Create Arcane unit with surge passive
         $arcaneUnit = SummonedUnit::factory()->create([
@@ -436,12 +461,15 @@ class BattleResolverTest extends TestCase
             'passive_key' => 'arcane_surge',
         ]);
 
+        $arcaneTeam = Team::factory()->create(['user_id' => $user->id]);
+        $arcaneTeam->units()->attach($arcaneUnit->id, ['position' => 1]);
+
         // Opponent with speed 18 (between base 15 and boosted 20)
         $defenderUnits = [
             ['id' => 99, 'name' => 'Mid-Speed', 'hp' => 500, 'attack' => 5, 'defense' => 10, 'speed' => 18],
         ];
 
-        $result = $this->resolver->resolveBattle([$arcaneUnit], $defenderUnits);
+        $result = $this->resolver->resolveBattle($arcaneTeam, $defenderUnits);
 
         // For the first 3 turns where arcane unit acts, it should go first
         // (speed 20 > 18)

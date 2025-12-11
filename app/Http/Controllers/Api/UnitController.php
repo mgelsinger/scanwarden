@@ -21,7 +21,8 @@ class UnitController extends Controller
     {
         if ($unit->user_id !== auth()->id()) {
             return response()->json([
-                'message' => 'This unit does not belong to you.'
+                'message' => 'Forbidden',
+                'code' => 'forbidden'
             ], 403);
         }
 

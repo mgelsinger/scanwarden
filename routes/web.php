@@ -60,11 +60,16 @@ Route::middleware(['auth', 'starter.selected'])->group(function () {
     Route::get('/battles', [BattleMatchesController::class, 'index'])->name('battles.index');
     Route::get('/battles/create', [BattleMatchesController::class, 'create'])->name('battles.create');
     Route::post('/battles', [BattleMatchesController::class, 'store'])->name('battles.store');
+    Route::post('/battles/practice', [BattleMatchesController::class, 'practice'])->name('battles.practice');
+    Route::post('/battles/pvp', [BattleMatchesController::class, 'pvp'])->name('battles.pvp');
     Route::get('/battles/{match}', [BattleMatchesController::class, 'show'])->name('battles.show');
     Route::delete('/battles/{match}', [BattleMatchesController::class, 'destroy'])->name('battles.destroy');
 
     // Leaderboard route
     Route::get('/leaderboard', [LeaderboardController::class, 'index'])->name('leaderboard.index');
+
+    // Player profile routes
+    Route::get('/players/{user}', [App\Http\Controllers\PlayerProfileController::class, 'show'])->name('players.show');
 
     // Lore routes
     Route::get('/lore', [LoreController::class, 'index'])->name('lore.index');

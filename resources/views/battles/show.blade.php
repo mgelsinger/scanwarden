@@ -47,7 +47,14 @@
                         <!-- Attacker Team -->
                         <div class="border-2 rounded-lg p-4 {{ $match->winner === 'attacker' ? 'border-green-500 bg-green-50' : 'border-gray-300' }}">
                             <div class="text-center mb-3">
-                                <div class="text-sm text-gray-500 mb-1">Attacker</div>
+                                <div class="text-sm text-gray-500 mb-1">
+                                    Attacker
+                                    @if ($match->attacker)
+                                        <a href="{{ route('players.show', $match->attacker) }}" class="text-blue-600 hover:underline ml-1">
+                                            ({{ $match->attacker->name }})
+                                        </a>
+                                    @endif
+                                </div>
                                 <h4 class="text-xl font-bold">{{ $match->attackerTeam->name }}</h4>
                                 @if ($match->winner === 'attacker')
                                     <div class="text-green-600 font-semibold mt-2">🏆 Victory</div>
@@ -86,7 +93,16 @@
                         <!-- Defender Team -->
                         <div class="border-2 rounded-lg p-4 {{ $match->winner === 'defender' ? 'border-green-500 bg-green-50' : 'border-gray-300' }}">
                             <div class="text-center mb-3">
-                                <div class="text-sm text-gray-500 mb-1">Defender</div>
+                                <div class="text-sm text-gray-500 mb-1">
+                                    Defender
+                                    @if ($match->defender)
+                                        <a href="{{ route('players.show', $match->defender) }}" class="text-blue-600 hover:underline ml-1">
+                                            ({{ $match->defender->name }})
+                                        </a>
+                                    @else
+                                        (AI)
+                                    @endif
+                                </div>
                                 <h4 class="text-xl font-bold">{{ $match->defenderTeam->name }}</h4>
                                 @if ($match->winner === 'defender')
                                     <div class="text-green-600 font-semibold mt-2">🏆 Victory</div>

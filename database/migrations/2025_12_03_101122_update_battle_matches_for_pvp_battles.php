@@ -15,7 +15,7 @@ return new class extends Migration
             // Add fields for team-based battles
             $table->foreignId('user_id')->after('id')->constrained()->cascadeOnDelete();
             $table->foreignId('attacker_team_id')->after('user_id')->constrained('teams')->cascadeOnDelete();
-            $table->foreignId('defender_team_id')->after('attacker_team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignId('defender_team_id')->nullable()->after('attacker_team_id')->constrained('teams')->cascadeOnDelete();
             $table->string('winner')->nullable()->after('defender_team_id'); // 'attacker' or 'defender'
             $table->integer('total_turns')->nullable()->after('winner');
             $table->integer('rating_change')->default(0)->after('total_turns');

@@ -34,12 +34,12 @@
                 <div class="p-6">
                     <h3 class="text-2xl font-bold mb-6">Top Players</h3>
 
-                    @if ($leaderboard->isEmpty())
+                    @if ($leaders->isEmpty())
                         <div class="text-center text-gray-500 py-12">
                             <div class="text-6xl mb-4">🏆</div>
                             <h3 class="text-xl font-semibold mb-2">No Rankings Yet</h3>
                             <p class="mb-4">Be the first to earn rating points by battling!</p>
-                            <a href="{{ route('battles.create') }}"
+                            <a href="{{ route('battles.index') }}"
                                class="inline-flex items-center px-4 py-2 bg-gray-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
                                 Start First Battle
                             </a>
@@ -61,29 +61,43 @@
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                             Tier
                                         </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Win Rate
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Battles
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach ($leaderboard as $index => $user)
+                                    @foreach ($leaders as $index => $entry)
+                                        @php
+                                            $user = $entry['user'];
+                                            $stats = $entry['stats'];
+                                            $tier = $entry['tier'];
+                                            $tierColor = $entry['tier_color'];
+                                        @endphp
                                         <tr class="{{ auth()->id() === $user->id ? 'bg-blue-50' : 'hover:bg-gray-50' }}">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
-                                                    @if ($leaderboard->firstItem() + $index === 1)
+                                                    @if ($index === 0)
                                                         <span class="text-3xl mr-2">🥇</span>
-                                                    @elseif ($leaderboard->firstItem() + $index === 2)
+                                                    @elseif ($index === 1)
                                                         <span class="text-3xl mr-2">🥈</span>
-                                                    @elseif ($leaderboard->firstItem() + $index === 3)
+                                                    @elseif ($index === 2)
                                                         <span class="text-3xl mr-2">🥉</span>
                                                     @endif
                                                     <div class="text-lg font-bold text-gray-900">
-                                                        #{{ $leaderboard->firstItem() + $index }}
+                                                        #{{ $index + 1 }}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="text-sm font-medium text-gray-900">
-                                                        {{ $user->name }}
+                                                        <a href="{{ route('players.show', $user) }}" class="text-blue-600 hover:underline">
+                                                            {{ $user->name }}
+                                                        </a>
                                                         @if (auth()->id() === $user->id)
                                                             <span class="ml-2 text-xs text-blue-600">(You)</span>
                                                         @endif
@@ -91,24 +105,30 @@
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <div class="text-lg font-bold" style="color: {{ $user->tier_color }}">
-                                                    {{ $user->rating }}
+                                                <div class="text-lg font-bold" style="color: {{ $tierColor }}">
+                                                    {{ $user->rating ?? 0 }}
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="inline-block px-3 py-1 rounded-full text-sm font-semibold"
-                                                      style="background-color: {{ $user->tier_color }}20; color: {{ $user->tier_color }};">
-                                                    {{ $user->tier }}
+                                                      style="background-color: {{ $tierColor }}20; color: {{ $tierColor }};">
+                                                    {{ $tier }}
                                                 </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    {{ $stats['win_rate'] }}%
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="text-sm text-gray-900">
+                                                    {{ $stats['total_battles'] }}
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
                             </table>
-                        </div>
-
-                        <div class="mt-6">
-                            {{ $leaderboard->links() }}
                         </div>
                     @endif
                 </div>

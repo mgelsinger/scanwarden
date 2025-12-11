@@ -2,18 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\QuestProgressService;
 use App\Services\RatingService;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
     public function __construct(
-        private RatingService $ratingService
+        private RatingService $ratingService,
+        private QuestProgressService $questProgressService
     ) {}
 
     public function index(): View
     {
         $user = auth()->user();
+
+        // Assign daily quests if not already assigned today
+        $this->questProgressService->assignDailyQuestsForUser($user);
 
         // Gather statistics
         $stats = [

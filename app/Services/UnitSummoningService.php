@@ -5,9 +5,17 @@ namespace App\Services;
 use App\Models\Sector;
 use App\Models\SummonedUnit;
 use App\Models\User;
+use App\Services\Battle\Passives\PassiveEngine;
 
 class UnitSummoningService
 {
+    private PassiveEngine $passiveEngine;
+
+    public function __construct()
+    {
+        $this->passiveEngine = new PassiveEngine();
+    }
+
     private array $nameTemplates = [
         'Food Sector' => ['Culinary', 'Gourmet', 'Savory', 'Sweet', 'Spicy', 'Bitter', 'Umami'],
         'Tech Sector' => ['Cyber', 'Digital', 'Quantum', 'Neural', 'Circuit', 'Data', 'Binary'],
@@ -41,6 +49,10 @@ class UnitSummoningService
         // Apply rarity multiplier
         $stats = $this->applyRarityMultiplier($baseStats, $rarity);
 
+        // Determine passive key based on sector
+        $passiveKey = $this->determinePassiveKey($sector, $rarity);
+
+        // Create unit first without passive_ability
         $unit = SummonedUnit::create([
             'user_id' => $user->id,
             'sector_id' => $sector->id,
@@ -52,8 +64,14 @@ class UnitSummoningService
             'attack' => $stats['attack'],
             'defense' => $stats['defense'],
             'speed' => $stats['speed'],
-            'passive_ability' => $this->generatePassiveAbility($sector, $rarity),
+            'passive_key' => $passiveKey,
+            'passive_ability' => null, // Will be set below
         ]);
+
+        // Load sector relation and generate passive description
+        $unit->load('sector');
+        $unit->passive_ability = $this->passiveEngine->getPassiveDescription($unit);
+        $unit->save();
 
         // Reset random seed
         srand();
@@ -108,22 +126,27 @@ class UnitSummoningService
         ];
     }
 
-    private function generatePassiveAbility(Sector $sector, string $rarity): ?string
+    /**
+     * Determine passive key for a unit based on sector and rarity
+     *
+     * @param Sector $sector The unit's sector
+     * @param string $rarity The unit's rarity
+     * @return string|null Passive key or null if no passive applies
+     */
+    private function determinePassiveKey(Sector $sector, string $rarity): ?string
     {
-        $abilities = [
-            'Food Sector' => 'Sustenance: Heals 5% HP at battle start',
-            'Tech Sector' => 'Overclock: +10% speed when HP above 50%',
-            'Bio Sector' => 'Regeneration: Heals 3 HP per turn',
-            'Industrial Sector' => 'Reinforced: +15% defense',
-            'Arcane Sector' => 'Mystic Strike: 20% chance to deal double damage',
-            'Household Sector' => 'Reliable: Cannot be stunned or disabled',
-        ];
-
+        // Common units get no passive
         if ($rarity === 'common') {
             return null;
         }
 
-        return $abilities[$sector->name] ?? null;
+        // Assign default passive based on sector
+        return match ($sector->name) {
+            'Tech Sector' => 'tech_overclock',
+            'Bio Sector' => 'bio_regeneration',
+            'Arcane Sector' => 'arcane_surge',
+            default => null,
+        };
     }
 
     public function summonUnitWithRarity(User $user, Sector $sector, string $upcSeed, string $rarity): SummonedUnit
@@ -141,6 +164,10 @@ class UnitSummoningService
         // Apply rarity multiplier
         $stats = $this->applyRarityMultiplier($baseStats, $rarity);
 
+        // Determine passive key based on sector
+        $passiveKey = $this->determinePassiveKey($sector, $rarity);
+
+        // Create unit first without passive_ability
         $unit = SummonedUnit::create([
             'user_id' => $user->id,
             'sector_id' => $sector->id,
@@ -152,9 +179,15 @@ class UnitSummoningService
             'attack' => $stats['attack'],
             'defense' => $stats['defense'],
             'speed' => $stats['speed'],
-            'passive_ability' => $this->generatePassiveAbility($sector, $rarity),
+            'passive_key' => $passiveKey,
+            'passive_ability' => null, // Will be set below
             'source' => 'transmutation',
         ]);
+
+        // Load sector relation and generate passive description
+        $unit->load('sector');
+        $unit->passive_ability = $this->passiveEngine->getPassiveDescription($unit);
+        $unit->save();
 
         // Reset random seed
         srand();

@@ -39,6 +39,9 @@
                     <x-nav-link :href="route('lore.index')" :active="request()->routeIs('lore.*')">
                         {{ __('Lore') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('quests.index')" :active="request()->routeIs('quests.*')">
+                        {{ __('Quests') }}
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -117,6 +120,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('lore.index')" :active="request()->routeIs('lore.*')">
                 {{ __('Lore') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('quests.index')" :active="request()->routeIs('quests.*')">
+                {{ __('Quests') }}
             </x-responsive-nav-link>
         </div>
 

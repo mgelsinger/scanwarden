@@ -3,6 +3,10 @@
 namespace App\Services;
 
 use App\Models\Team;
+use App\Models\User;
+use App\Models\SummonedUnit;
+use App\Services\Battle\BattleResult;
+use App\Services\Battle\Passives\PassiveEngine;
 use Illuminate\Support\Collection;
 
 /**
@@ -10,100 +14,449 @@ use Illuminate\Support\Collection;
  *
  * This service handles the turn-based combat system for ScanWarden.
  * It can work with real teams or synthetic AI teams.
+ *
+ * Features:
+ * - Deterministic battles with optional seed for testing
+ * - Passive ability system integrated through hooks
+ * - Returns structured BattleResult DTO
  */
 class BattleResolver
 {
     private const MAX_TURNS = 50;
 
-    /**
-     * Resolve a battle between two teams
-     *
-     * @param Team|Collection $attackerTeam Team model or collection of unit data
-     * @param Team|Collection $defenderTeam Team model or collection of unit data
-     * @return array Battle results with winner, logs, and final state
-     */
-    public function resolveBattle($attackerTeam, $defenderTeam): array
-    {
-        // Convert teams to unit arrays
-        $attackerUnits = $this->prepareUnits($attackerTeam, 'attacker');
-        $defenderUnits = $this->prepareUnits($defenderTeam, 'defender');
+    /** @var bool Enable damage variance */
+    private bool $enableVariance = false;
 
-        $allUnits = array_merge($attackerUnits, $defenderUnits);
+    /** @var int|null RNG seed for deterministic battles */
+    private ?int $seed = null;
+
+    /** @var PassiveEngine Passive ability engine */
+    private PassiveEngine $passiveEngine;
+
+    public function __construct()
+    {
+        $this->passiveEngine = new PassiveEngine();
+    }
+
+    /**
+     * Resolve a battle between two teams (new standardized API)
+     *
+     * @param User $attacker The attacking user
+     * @param Team|Collection|array $attackerTeam Team model or collection of unit data
+     * @param User|null $defender The defending user (null for practice/AI battles)
+     * @param Team|Collection|array $defenderTeam Team model or collection of unit data
+     * @param array $options Optional configuration: ['seed' => int, 'enable_variance' => bool, 'max_turns' => int]
+     * @return BattleResult
+     */
+    public function resolve(
+        User $attacker,
+        $attackerTeam,
+        ?User $defender,
+        $defenderTeam,
+        array $options = []
+    ): BattleResult {
+        // Configure options
+        $this->seed = $options['seed'] ?? null;
+        $this->enableVariance = $options['enable_variance'] ?? false;
+        $maxTurns = $options['max_turns'] ?? self::MAX_TURNS;
+
+        // Seed RNG if provided
+        if ($this->seed !== null) {
+            mt_srand($this->seed);
+        }
+
+        // Initialize battle state
+        $battleState = $this->initializeBattleState($attackerTeam, $defenderTeam);
+
+        // Attach passives and trigger onBattleStart
+        $this->attachPassivesToBattle($battleState);
+
+        // Run battle simulation
         $turnLogs = [];
         $turnNumber = 0;
 
-        while ($turnNumber < self::MAX_TURNS) {
-            // Filter living units
-            $livingUnits = array_values(array_filter($allUnits, fn($u) => $u['hp'] > 0));
-
-            if (empty($livingUnits)) {
+        while ($turnNumber < $maxTurns) {
+            // Check battle end condition
+            if ($this->checkBattleEndCondition($battleState)) {
                 break;
             }
 
-            // Check if one team is eliminated
-            $livingAttackers = array_filter($livingUnits, fn($u) => $u['team'] === 'attacker');
-            $livingDefenders = array_filter($livingUnits, fn($u) => $u['team'] === 'defender');
+            // Determine turn order
+            $activeUnits = $this->determineTurnOrder($battleState);
 
-            if (empty($livingAttackers) || empty($livingDefenders)) {
+            if (empty($activeUnits)) {
                 break;
             }
-
-            // Sort by speed (highest acts first)
-            usort($livingUnits, fn($a, $b) => $b['speed'] <=> $a['speed']);
 
             // Current unit acts
-            $currentUnit = $livingUnits[0];
+            $currentUnit = $activeUnits[0];
+            $unitId = $this->getUnitIdentifier($currentUnit);
 
-            // Find target (lowest HP enemy for consistent behavior)
-            $enemies = $currentUnit['team'] === 'attacker'
-                ? array_values($livingDefenders)
-                : array_values($livingAttackers);
+            // Before turn hook - trigger passives
+            $this->beforeTurnHook($currentUnit, $battleState, $unitId);
 
-            usort($enemies, fn($a, $b) => $a['hp'] <=> $b['hp']);
-            $target = $enemies[0];
+            // Perform action
+            $actionResult = $this->performAction($currentUnit, $battleState, $unitId);
 
-            // Calculate damage: attack - (defense * 0.5), minimum 1
-            $rawDamage = $currentUnit['attack'] - (int) floor($target['defense'] * 0.5);
-            $damage = max(1, $rawDamage);
+            // After turn hook - trigger passives
+            $this->afterTurnHook($currentUnit, $actionResult, $battleState, $unitId);
 
-            // Apply damage to all units array
-            foreach ($allUnits as &$unit) {
-                if ($unit['id'] === $target['id'] && $unit['team'] === $target['team']) {
-                    $unit['hp'] = max($unit['hp'] - $damage, 0);
-                    $wasKO = $unit['hp'] <= 0;
-
-                    // Log this turn
-                    $turnLogs[] = [
-                        'turn' => $turnNumber + 1,
-                        'attacker' => $currentUnit['name'],
-                        'attacker_team' => $currentUnit['team'],
-                        'defender' => $target['name'],
-                        'defender_team' => $target['team'],
-                        'damage' => $damage,
-                        'defender_hp_after' => $unit['hp'],
-                        'was_ko' => $wasKO,
-                    ];
-                    break;
-                }
-            }
+            // Log turn
+            $turnLogs[] = $this->createTurnLog($turnNumber + 1, $currentUnit, $actionResult);
 
             $turnNumber++;
         }
 
-        // Determine winner
-        $finalLivingUnits = array_filter($allUnits, fn($u) => $u['hp'] > 0);
-        $finalAttackers = array_filter($finalLivingUnits, fn($u) => $u['team'] === 'attacker');
-        $finalDefenders = array_filter($finalLivingUnits, fn($u) => $u['team'] === 'defender');
+        // Determine final outcome
+        $outcome = $this->determineFinalOutcome($battleState, $turnNumber, $maxTurns);
 
-        $winner = $this->determineWinner($finalAttackers, $finalDefenders, $turnNumber);
+        // Determine winner user ID
+        $winnerUserId = $this->determineWinnerUserId($outcome, $attacker, $defender);
+
+        // Get final unit states
+        $finalStates = $this->getFinalStates($battleState);
+
+        // Count survivors
+        $attackerSurvivors = count(array_filter($battleState['attacker_units'], fn($u) => $u['hp'] > 0));
+        $defenderSurvivors = count(array_filter($battleState['defender_units'], fn($u) => $u['hp'] > 0));
+
+        return new BattleResult(
+            outcome: $outcome,
+            winnerUserId: $winnerUserId,
+            turns: $turnLogs,
+            finalStates: $finalStates,
+            totalTurns: $turnNumber,
+            attackerSurvivors: $attackerSurvivors,
+            defenderSurvivors: $defenderSurvivors
+        );
+    }
+
+    /**
+     * Initialize battle state from teams
+     *
+     * @param mixed $attackerTeam
+     * @param mixed $defenderTeam
+     * @return array
+     */
+    private function initializeBattleState($attackerTeam, $defenderTeam): array
+    {
+        $attackerUnits = $this->prepareUnits($attackerTeam, 'attacker');
+        $defenderUnits = $this->prepareUnits($defenderTeam, 'defender');
 
         return [
-            'winner' => $winner,
-            'turns' => $turnLogs,
-            'total_turns' => $turnNumber,
-            'attacker_survivors' => count($finalAttackers),
-            'defender_survivors' => count($finalDefenders),
+            'attacker_units' => $attackerUnits,
+            'defender_units' => $defenderUnits,
+            'all_units' => array_merge($attackerUnits, $defenderUnits),
         ];
+    }
+
+    /**
+     * Attach passives to battle and trigger onBattleStart
+     *
+     * @param array $battleState
+     * @return void
+     */
+    private function attachPassivesToBattle(array &$battleState): void
+    {
+        // Build map of unit ID => SummonedUnit model
+        $unitsById = [];
+
+        foreach ($battleState['all_units'] as $unit) {
+            $unitId = $this->getUnitIdentifier($unit);
+
+            // Only attach passives if unit has a model (not AI dummy)
+            if (isset($unit['model']) && $unit['model'] instanceof SummonedUnit) {
+                $unitsById[$unitId] = $unit['model'];
+            }
+        }
+
+        // Attach passives via engine
+        $this->passiveEngine->attachPassivesToBattleState($battleState, $unitsById);
+
+        // Trigger onBattleStart for all passives
+        $this->passiveEngine->triggerOnBattleStart($battleState);
+    }
+
+    /**
+     * Get unique identifier for a unit
+     *
+     * @param array $unit
+     * @return string
+     */
+    private function getUnitIdentifier(array $unit): string
+    {
+        return $unit['team'] . '_' . $unit['id'];
+    }
+
+    /**
+     * Determine turn order (fastest units first)
+     *
+     * @param array $battleState
+     * @return array Living units sorted by speed
+     */
+    private function determineTurnOrder(array &$battleState): array
+    {
+        $livingUnits = array_values(array_filter($battleState['all_units'], fn($u) => $u['hp'] > 0));
+
+        // Sort by speed (highest acts first)
+        usort($livingUnits, fn($a, $b) => $b['speed'] <=> $a['speed']);
+
+        return $livingUnits;
+    }
+
+    /**
+     * Hook called before each turn - triggers passives
+     *
+     * @param array $currentUnit
+     * @param array $battleState
+     * @param string $unitId
+     * @return void
+     */
+    private function beforeTurnHook(array $currentUnit, array &$battleState, string $unitId): void
+    {
+        // Trigger passive hooks for this unit
+        $this->passiveEngine->triggerBeforeUnitActs($battleState, $unitId);
+    }
+
+    /**
+     * Perform unit's action (attack)
+     *
+     * @param array $currentUnit
+     * @param array $battleState
+     * @param string $unitId
+     * @return array Action result with target and damage info
+     */
+    private function performAction(array $currentUnit, array &$battleState, string $unitId): array
+    {
+        // Find target (lowest HP enemy)
+        $enemies = $this->getEnemies($currentUnit['team'], $battleState);
+
+        if (empty($enemies)) {
+            return [
+                'success' => false,
+                'reason' => 'no_targets',
+            ];
+        }
+
+        usort($enemies, fn($a, $b) => $a['hp'] <=> $b['hp']);
+        $target = $enemies[0];
+        $targetId = $this->getUnitIdentifier($target);
+
+        // Calculate base damage: attack - (defense * 0.5), minimum 1
+        $rawDamage = $currentUnit['attack'] - (int) floor($target['defense'] * 0.5);
+        $damage = max(1, $rawDamage);
+
+        // Apply attacker's damage_out_multiplier (from passives)
+        $damageOutMultiplier = $battleState['units'][$unitId]['stats']['damage_out_multiplier'] ?? 1.0;
+        $damage = (int) floor($damage * $damageOutMultiplier);
+
+        // Apply defender's damage_in_multiplier (from passives)
+        $damageInMultiplier = $battleState['units'][$targetId]['stats']['damage_in_multiplier'] ?? 1.0;
+        $damage = (int) floor($damage * $damageInMultiplier);
+
+        // Ensure minimum damage of 1
+        $damage = max(1, $damage);
+
+        // Apply variance if enabled
+        if ($this->enableVariance) {
+            $variance = $this->randomBetween(-2, 2);
+            $damage = max(1, $damage + $variance);
+        }
+
+        // Apply damage to target
+        $wasKO = false;
+        foreach ($battleState['all_units'] as &$unit) {
+            if ($unit['id'] === $target['id'] && $unit['team'] === $target['team']) {
+                $unit['hp'] = max($unit['hp'] - $damage, 0);
+                $wasKO = $unit['hp'] <= 0;
+                break;
+            }
+        }
+
+        // Update team-specific arrays
+        $this->syncTeamUnits($battleState);
+
+        return [
+            'success' => true,
+            'attacker' => $currentUnit,
+            'target' => $target,
+            'damage' => $damage,
+            'target_hp_after' => $target['hp'] - $damage < 0 ? 0 : $target['hp'] - $damage,
+            'was_ko' => $wasKO,
+        ];
+    }
+
+    /**
+     * Hook called after each turn - triggers passives
+     *
+     * @param array $currentUnit
+     * @param array $actionResult
+     * @param array $battleState
+     * @param string $unitId
+     * @return void
+     */
+    private function afterTurnHook(array $currentUnit, array $actionResult, array &$battleState, string $unitId): void
+    {
+        // Trigger passive hooks for this unit
+        $this->passiveEngine->triggerAfterUnitActs($battleState, $unitId);
+    }
+
+    /**
+     * Check if battle should end
+     *
+     * @param array $battleState
+     * @return bool
+     */
+    private function checkBattleEndCondition(array $battleState): bool
+    {
+        $livingAttackers = array_filter($battleState['attacker_units'], fn($u) => $u['hp'] > 0);
+        $livingDefenders = array_filter($battleState['defender_units'], fn($u) => $u['hp'] > 0);
+
+        return empty($livingAttackers) || empty($livingDefenders);
+    }
+
+    /**
+     * Determine final battle outcome
+     *
+     * @param array $battleState
+     * @param int $turnNumber
+     * @param int $maxTurns
+     * @return string 'attacker_win', 'defender_win', or 'draw'
+     */
+    private function determineFinalOutcome(array $battleState, int $turnNumber, int $maxTurns): string
+    {
+        $livingAttackers = array_filter($battleState['attacker_units'], fn($u) => $u['hp'] > 0);
+        $livingDefenders = array_filter($battleState['defender_units'], fn($u) => $u['hp'] > 0);
+
+        $attackerCount = count($livingAttackers);
+        $defenderCount = count($livingDefenders);
+
+        if ($attackerCount > 0 && $defenderCount === 0) {
+            return 'attacker_win';
+        }
+
+        if ($defenderCount > 0 && $attackerCount === 0) {
+            return 'defender_win';
+        }
+
+        // Draw or timeout - compare remaining HP
+        if ($turnNumber >= $maxTurns) {
+            $attackerTotalHp = array_sum(array_column($livingAttackers, 'hp'));
+            $defenderTotalHp = array_sum(array_column($livingDefenders, 'hp'));
+
+            if ($attackerTotalHp > $defenderTotalHp) {
+                return 'attacker_win';
+            } elseif ($defenderTotalHp > $attackerTotalHp) {
+                return 'defender_win';
+            }
+        }
+
+        return 'draw';
+    }
+
+    /**
+     * Determine winner user ID from outcome
+     *
+     * @param string $outcome
+     * @param User $attacker
+     * @param User|null $defender
+     * @return int|null
+     */
+    private function determineWinnerUserId(string $outcome, User $attacker, ?User $defender): ?int
+    {
+        return match ($outcome) {
+            'attacker_win' => $attacker->id,
+            'defender_win' => $defender?->id,
+            default => null,
+        };
+    }
+
+    /**
+     * Get enemies for a given team
+     *
+     * @param string $team
+     * @param array $battleState
+     * @return array
+     */
+    private function getEnemies(string $team, array $battleState): array
+    {
+        $enemyUnits = $team === 'attacker'
+            ? $battleState['defender_units']
+            : $battleState['attacker_units'];
+
+        return array_values(array_filter($enemyUnits, fn($u) => $u['hp'] > 0));
+    }
+
+    /**
+     * Sync all_units changes back to team-specific arrays
+     *
+     * @param array $battleState
+     * @return void
+     */
+    private function syncTeamUnits(array &$battleState): void
+    {
+        $battleState['attacker_units'] = array_values(array_filter(
+            $battleState['all_units'],
+            fn($u) => $u['team'] === 'attacker'
+        ));
+
+        $battleState['defender_units'] = array_values(array_filter(
+            $battleState['all_units'],
+            fn($u) => $u['team'] === 'defender'
+        ));
+    }
+
+    /**
+     * Create a turn log entry
+     *
+     * @param int $turnNumber
+     * @param array $currentUnit
+     * @param array $actionResult
+     * @return array
+     */
+    private function createTurnLog(int $turnNumber, array $currentUnit, array $actionResult): array
+    {
+        if (!$actionResult['success']) {
+            return [
+                'turn' => $turnNumber,
+                'success' => false,
+                'reason' => $actionResult['reason'] ?? 'unknown',
+            ];
+        }
+
+        return [
+            'turn' => $turnNumber,
+            'attacker' => $currentUnit['name'],
+            'attacker_team' => $currentUnit['team'],
+            'defender' => $actionResult['target']['name'],
+            'defender_team' => $actionResult['target']['team'],
+            'damage' => $actionResult['damage'],
+            'defender_hp_after' => $actionResult['target_hp_after'],
+            'was_ko' => $actionResult['was_ko'],
+        ];
+    }
+
+    /**
+     * Get final states of all units
+     *
+     * @param array $battleState
+     * @return array
+     */
+    private function getFinalStates(array $battleState): array
+    {
+        return $battleState['all_units'];
+    }
+
+    /**
+     * Random number between min and max (controllable for testing)
+     *
+     * @param int $min
+     * @param int $max
+     * @return int
+     */
+    private function randomBetween(int $min, int $max): int
+    {
+        return mt_rand($min, $max);
     }
 
     /**
@@ -151,45 +504,8 @@ class BattleResolver
             'defense' => $unit->defense ?? $unit['defense'],
             'speed' => $unit->speed ?? $unit['speed'],
             'team' => $teamSide,
+            'model' => ($unit instanceof SummonedUnit) ? $unit : null, // Store reference for passives
         ];
-    }
-
-    /**
-     * Determine battle winner
-     *
-     * @param array $finalAttackers
-     * @param array $finalDefenders
-     * @param int $turnNumber
-     * @return string 'attacker', 'defender', or 'draw'
-     */
-    private function determineWinner(array $finalAttackers, array $finalDefenders, int $turnNumber): string
-    {
-        $attackerCount = count($finalAttackers);
-        $defenderCount = count($finalDefenders);
-
-        if ($attackerCount > 0 && $defenderCount === 0) {
-            return 'attacker';
-        }
-
-        if ($defenderCount > 0 && $attackerCount === 0) {
-            return 'defender';
-        }
-
-        // Draw or timeout - compare remaining HP
-        if ($turnNumber >= self::MAX_TURNS) {
-            $attackerTotalHp = array_sum(array_column($finalAttackers, 'hp'));
-            $defenderTotalHp = array_sum(array_column($finalDefenders, 'hp'));
-
-            if ($attackerTotalHp > $defenderTotalHp) {
-                return 'attacker';
-            } elseif ($defenderTotalHp > $attackerTotalHp) {
-                return 'defender';
-            }
-
-            return 'draw';
-        }
-
-        return 'draw';
     }
 
     /**
@@ -219,16 +535,45 @@ class BattleResolver
 
         $units = [];
         for ($i = 0; $i < $unitCount; $i++) {
+            // Use deterministic speed if seed is set
+            $speedVariation = $this->seed !== null ? 0 : $this->randomBetween(-2, 2);
+
             $units[] = [
                 'id' => 'dummy_' . $i,
                 'name' => $names[$i],
                 'hp' => $stats['hp'],
                 'attack' => $stats['attack'],
                 'defense' => $stats['defense'],
-                'speed' => $stats['speed'] + rand(-2, 2), // Slight variation
+                'speed' => $stats['speed'] + $speedVariation,
             ];
         }
 
         return $units;
+    }
+
+    /**
+     * Legacy method for backwards compatibility
+     *
+     * @deprecated Use resolve() instead
+     * @param Team|Collection $attackerTeam
+     * @param Team|Collection $defenderTeam
+     * @return array
+     */
+    public function resolveBattle($attackerTeam, $defenderTeam): array
+    {
+        // Create dummy users for legacy API
+        $dummyAttacker = new User(['id' => 0]);
+        $dummyDefender = new User(['id' => 0]);
+
+        $result = $this->resolve($dummyAttacker, $attackerTeam, $dummyDefender, $defenderTeam);
+
+        // Convert to legacy format
+        return [
+            'winner' => $result->getWinnerSide(),
+            'turns' => $result->turns,
+            'total_turns' => $result->totalTurns,
+            'attacker_survivors' => $result->attackerSurvivors,
+            'defender_survivors' => $result->defenderSurvivors,
+        ];
     }
 }

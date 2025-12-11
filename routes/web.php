@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\LoreController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuestController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\ScanHistoryController;
 use App\Http\Controllers\StarterController;
@@ -78,6 +79,9 @@ Route::middleware(['auth', 'starter.selected'])->group(function () {
     // Transmuter routes
     Route::get('/transmuter', [App\Http\Controllers\TransmuterController::class, 'index'])->name('transmuter.index');
     Route::post('/transmuter/{recipe}', [App\Http\Controllers\TransmuterController::class, 'transmute'])->name('transmuter.transmute');
+
+    // Quest routes
+    Route::get('/quests', [QuestController::class, 'index'])->name('quests.index');
 });
 
 require __DIR__.'/auth.php';

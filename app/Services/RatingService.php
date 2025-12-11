@@ -3,77 +3,122 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\Battle\BattleResult;
 
+/**
+ * RatingService - Centralized PvP rating calculation and updates
+ *
+ * Handles all rating changes from battle outcomes.
+ * Rating changes only apply to PvP battles, not practice battles.
+ *
+ * Current system: Simple +10 for win, -5 for loss, 0 for draw
+ * (Note: ELO-based system was removed in favor of simpler, more predictable system)
+ */
 class RatingService
 {
-    /**
-     * K-factor for ELO rating system
-     * Higher K = more volatile rating changes
-     */
-    private const K_FACTOR = 32;
-
-    /**
-     * Default starting rating for new players
-     */
+    /** @var int Default starting rating */
     public const DEFAULT_RATING = 1200;
 
+    /** @var int Rating gain for winning */
+    private const WIN_RATING_GAIN = 10;
+
+    /** @var int Rating loss for losing */
+    private const LOSS_RATING_PENALTY = 5;
+
+    /** @var int Minimum rating floor */
+    private const RATING_FLOOR = 0;
+
     /**
-     * Calculate new ratings after a battle
+     * Apply battle result to both users' ratings
      *
-     * @param User $winner
-     * @param User $loser
-     * @return array ['winner_new_rating' => int, 'loser_new_rating' => int, 'winner_change' => int, 'loser_change' => int]
+     * @param User $attacker The attacking user
+     * @param User $defender The defending user
+     * @param BattleResult $result The battle resolution result
+     * @return array Rating change details: ['attacker' => [...], 'defender' => [...]]
      */
-    public function calculateNewRatings(User $winner, User $loser): array
+    public function applyBattleResult(User $attacker, User $defender, BattleResult $result): array
     {
-        $winnerRating = $winner->rating ?? self::DEFAULT_RATING;
-        $loserRating = $loser->rating ?? self::DEFAULT_RATING;
+        $attackerOldRating = $attacker->rating ?? self::DEFAULT_RATING;
+        $defenderOldRating = $defender->rating ?? self::DEFAULT_RATING;
 
-        // Calculate expected scores
-        $winnerExpected = $this->getExpectedScore($winnerRating, $loserRating);
-        $loserExpected = $this->getExpectedScore($loserRating, $winnerRating);
+        // Calculate rating changes based on outcome
+        [$attackerChange, $defenderChange] = $this->calculateRatingChanges($result->outcome);
 
-        // Calculate new ratings
-        // Winner gets 1 point, loser gets 0 points
-        $winnerNewRating = (int)round($winnerRating + self::K_FACTOR * (1 - $winnerExpected));
-        $loserNewRating = (int)round($loserRating + self::K_FACTOR * (0 - $loserExpected));
+        // Apply changes with floor enforcement
+        $attackerNewRating = max(self::RATING_FLOOR, $attackerOldRating + $attackerChange);
+        $defenderNewRating = max(self::RATING_FLOOR, $defenderOldRating + $defenderChange);
+
+        // Update users
+        $attacker->update(['rating' => $attackerNewRating]);
+        $defender->update(['rating' => $defenderNewRating]);
 
         return [
-            'winner_new_rating' => $winnerNewRating,
-            'loser_new_rating' => $loserNewRating,
-            'winner_change' => $winnerNewRating - $winnerRating,
-            'loser_change' => $loserNewRating - $loserRating,
+            'attacker' => [
+                'old_rating' => $attackerOldRating,
+                'new_rating' => $attackerNewRating,
+                'change' => $attackerChange,
+            ],
+            'defender' => [
+                'old_rating' => $defenderOldRating,
+                'new_rating' => $defenderNewRating,
+                'change' => $defenderChange,
+            ],
         ];
     }
 
     /**
-     * Calculate expected score for a player
-     * Formula: 1 / (1 + 10^((opponentRating - playerRating) / 400))
+     * Calculate rating changes for both players based on outcome
      *
-     * @param int $playerRating
-     * @param int $opponentRating
-     * @return float
+     * @param string $outcome 'attacker_win', 'defender_win', or 'draw'
+     * @return array [attackerChange, defenderChange]
      */
-    private function getExpectedScore(int $playerRating, int $opponentRating): float
+    private function calculateRatingChanges(string $outcome): array
     {
-        return 1 / (1 + pow(10, ($opponentRating - $playerRating) / 400));
+        return match ($outcome) {
+            'attacker_win' => [self::WIN_RATING_GAIN, -self::LOSS_RATING_PENALTY],
+            'defender_win' => [-self::LOSS_RATING_PENALTY, self::WIN_RATING_GAIN],
+            'draw' => [0, 0],
+            default => [0, 0],
+        };
     }
 
     /**
-     * Update ratings for both players after a battle
+     * Get default starting rating
      *
-     * @param User $winner
-     * @param User $loser
+     * @return int
+     */
+    public function getDefaultRating(): int
+    {
+        return self::DEFAULT_RATING;
+    }
+
+    /**
+     * Preview rating changes without applying them
+     *
+     * @param User $attacker
+     * @param User $defender
+     * @param string $outcome
      * @return array
      */
-    public function updateRatings(User $winner, User $loser): array
+    public function previewRatingChanges(User $attacker, User $defender, string $outcome): array
     {
-        $ratings = $this->calculateNewRatings($winner, $loser);
+        $attackerOldRating = $attacker->rating ?? self::DEFAULT_RATING;
+        $defenderOldRating = $defender->rating ?? self::DEFAULT_RATING;
 
-        $winner->update(['rating' => $ratings['winner_new_rating']]);
-        $loser->update(['rating' => $ratings['loser_new_rating']]);
+        [$attackerChange, $defenderChange] = $this->calculateRatingChanges($outcome);
 
-        return $ratings;
+        return [
+            'attacker' => [
+                'old_rating' => $attackerOldRating,
+                'new_rating' => max(self::RATING_FLOOR, $attackerOldRating + $attackerChange),
+                'change' => $attackerChange,
+            ],
+            'defender' => [
+                'old_rating' => $defenderOldRating,
+                'new_rating' => max(self::RATING_FLOOR, $defenderOldRating + $defenderChange),
+                'change' => $defenderChange,
+            ],
+        ];
     }
 
     /**

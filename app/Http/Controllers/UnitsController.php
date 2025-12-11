@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SectorEnergy;
 use App\Models\SummonedUnit;
+use App\Models\UserEssence;
 use App\Services\EvolutionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,12 +76,25 @@ class UnitsController extends Controller
             ->where('sector_id', $unit->sector_id)
             ->first();
 
+        // Get user's essence balances
+        $genericEssence = UserEssence::where('user_id', auth()->id())
+            ->where('type', 'generic')
+            ->whereNull('sector_id')
+            ->first();
+
+        $sectorEssence = UserEssence::where('user_id', auth()->id())
+            ->where('type', 'sector')
+            ->where('sector_id', $unit->sector_id)
+            ->first();
+
         return view('units.show', [
             'unit' => $unit,
             'canEvolve' => $canEvolve,
             'requirements' => $requirements,
             'preview' => $preview,
             'userSectorEnergy' => $sectorEnergy?->current_energy ?? 0,
+            'userGenericEssence' => $genericEssence?->amount ?? 0,
+            'userSectorEssence' => $sectorEssence?->amount ?? 0,
         ]);
     }
 

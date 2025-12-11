@@ -10,6 +10,8 @@ class EvolutionRule extends Model
         'from_tier',
         'to_tier',
         'required_sector_energy',
+        'required_generic_essence',
+        'required_sector_essence',
         'hp_multiplier',
         'attack_multiplier',
         'defense_multiplier',

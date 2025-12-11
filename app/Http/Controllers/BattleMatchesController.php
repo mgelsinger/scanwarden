@@ -8,12 +8,21 @@ use App\Models\BattleMatch;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\BattleResolver;
+use App\Services\QuestProgressService;
+use App\Services\RatingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BattleMatchesController extends Controller
 {
+    public function __construct(
+        private QuestProgressService $questProgressService,
+        private BattleResolver $battleResolver,
+        private RatingService $ratingService
+    ) {
+    }
+
     public function index(): View
     {
         $user = auth()->user();
@@ -115,7 +124,7 @@ class BattleMatchesController extends Controller
     /**
      * Initiate a practice battle vs AI
      */
-    public function practice(Request $request, BattleResolver $battleResolver)
+    public function practice(Request $request)
     {
         $validated = $request->validate([
             'team_id' => ['required', 'exists:teams,id'],
@@ -123,9 +132,10 @@ class BattleMatchesController extends Controller
         ]);
 
         $team = Team::findOrFail($validated['team_id']);
+        $user = auth()->user();
 
         // Verify ownership
-        if ($team->user_id !== auth()->id()) {
+        if ($team->user_id !== $user->id) {
             abort(403);
         }
 
@@ -135,35 +145,38 @@ class BattleMatchesController extends Controller
         }
 
         $difficulty = $validated['difficulty'] ?? 'medium';
-        $dummyTeam = $battleResolver->generateDummyTeam(3, $difficulty);
+        $dummyTeam = $this->battleResolver->generateDummyTeam(3, $difficulty);
 
         DB::beginTransaction();
         try {
-            // Run battle immediately (synchronous for practice)
-            $results = $battleResolver->resolveBattle($team, $dummyTeam);
+            // Run battle using new standardized API
+            $result = $this->battleResolver->resolve($user, $team, null, $dummyTeam);
 
             // Create battle match record
             $match = BattleMatch::create([
-                'user_id' => auth()->id(),
+                'user_id' => $user->id,
                 'attacker_team_id' => $team->id,
                 'defender_team_id' => null, // No defender team for practice
-                'attacker_id' => auth()->id(),
+                'attacker_id' => $user->id,
                 'defender_id' => null, // AI opponent
-                'winner_id' => $results['winner'] === 'attacker' ? auth()->id() : null,
-                'winner' => $results['winner'],
-                'total_turns' => $results['total_turns'],
+                'winner_id' => $result->attackerWon() ? $user->id : null,
+                'winner' => $result->getWinnerSide(),
+                'total_turns' => $result->totalTurns,
                 'rating_change' => 0, // No rating change for practice
                 'status' => 'completed',
             ]);
 
             // Save battle logs
-            foreach ($results['turns'] as $index => $turn) {
+            foreach ($result->turns as $index => $turn) {
                 BattleLog::create([
                     'battle_match_id' => $match->id,
                     'turn_index' => $index,
                     'turn_data' => $turn,
                 ]);
             }
+
+            // Increment quest progress for practice battles
+            $this->questProgressService->incrementProgress($user, 'battle_practice', 1);
 
             DB::commit();
 
@@ -180,16 +193,17 @@ class BattleMatchesController extends Controller
     /**
      * Initiate a PvP battle vs another player
      */
-    public function pvp(Request $request, BattleResolver $battleResolver)
+    public function pvp(Request $request)
     {
         $validated = $request->validate([
             'team_id' => ['required', 'exists:teams,id'],
         ]);
 
         $attackerTeam = Team::findOrFail($validated['team_id']);
+        $attacker = auth()->user();
 
         // Verify ownership
-        if ($attackerTeam->user_id !== auth()->id()) {
+        if ($attackerTeam->user_id !== $attacker->id) {
             abort(403);
         }
 
@@ -199,7 +213,7 @@ class BattleMatchesController extends Controller
         }
 
         // Find a random opponent (simple matchmaking)
-        $opponent = User::where('id', '!=', auth()->id())
+        $opponent = User::where('id', '!=', $attacker->id)
             ->whereHas('teams.units') // Has at least one team with units
             ->inRandomOrder()
             ->first();
@@ -220,66 +234,32 @@ class BattleMatchesController extends Controller
 
         DB::beginTransaction();
         try {
-            $attacker = auth()->user();
+            // Run battle using new standardized API
+            $result = $this->battleResolver->resolve($attacker, $attackerTeam, $opponent, $defenderTeam);
 
-            // Run battle immediately (synchronous)
-            $results = $battleResolver->resolveBattle($attackerTeam, $defenderTeam);
-
-            // Determine winner/loser for rating
-            $attackerWon = $results['winner'] === 'attacker';
-            $isDraw = $results['winner'] === 'draw';
-
-            // Simple rating system: Win +10, Lose -5, Draw 0
-            $attackerRatingChange = 0;
-            $defenderRatingChange = 0;
-
-            if (!$isDraw) {
-                if ($attackerWon) {
-                    $attackerRatingChange = 10;
-                    $defenderRatingChange = -5;
-                } else {
-                    $attackerRatingChange = -5;
-                    $defenderRatingChange = 10;
-                }
-            }
-
-            // Update ratings (enforce minimum 0)
-            $attackerOldRating = $attacker->rating ?? 1200;
-            $defenderOldRating = $opponent->rating ?? 1200;
-
-            $attackerNewRating = max(0, $attackerOldRating + $attackerRatingChange);
-            $defenderNewRating = max(0, $defenderOldRating + $defenderRatingChange);
-
-            $attacker->update(['rating' => $attackerNewRating]);
-            $opponent->update(['rating' => $defenderNewRating]);
+            // Apply rating changes using RatingService
+            $ratings = $this->ratingService->applyBattleResult($attacker, $opponent, $result);
 
             // Create battle match record
-            $winnerId = null;
-            if ($attackerWon) {
-                $winnerId = $attacker->id;
-            } elseif (!$isDraw) {
-                $winnerId = $opponent->id;
-            }
-
             $match = BattleMatch::create([
                 'user_id' => $attacker->id,
                 'attacker_team_id' => $attackerTeam->id,
                 'defender_team_id' => $defenderTeam->id,
                 'attacker_id' => $attacker->id,
                 'defender_id' => $opponent->id,
-                'winner_id' => $winnerId,
-                'winner' => $results['winner'],
-                'total_turns' => $results['total_turns'],
-                'rating_change' => $attackerRatingChange,
-                'attacker_rating_before' => $attackerOldRating,
-                'attacker_rating_after' => $attackerNewRating,
-                'defender_rating_before' => $defenderOldRating,
-                'defender_rating_after' => $defenderNewRating,
+                'winner_id' => $result->winnerUserId,
+                'winner' => $result->getWinnerSide(),
+                'total_turns' => $result->totalTurns,
+                'rating_change' => $ratings['attacker']['change'],
+                'attacker_rating_before' => $ratings['attacker']['old_rating'],
+                'attacker_rating_after' => $ratings['attacker']['new_rating'],
+                'defender_rating_before' => $ratings['defender']['old_rating'],
+                'defender_rating_after' => $ratings['defender']['new_rating'],
                 'status' => 'completed',
             ]);
 
             // Save battle logs
-            foreach ($results['turns'] as $index => $turn) {
+            foreach ($result->turns as $index => $turn) {
                 BattleLog::create([
                     'battle_match_id' => $match->id,
                     'turn_index' => $index,
@@ -287,13 +267,26 @@ class BattleMatchesController extends Controller
                 ]);
             }
 
+            // Increment quest progress for PvP battles
+            $this->questProgressService->incrementProgress($attacker, 'battle_pvp', 1);
+            $this->questProgressService->incrementProgress($opponent, 'battle_pvp', 1);
+
+            // Increment win quest for winner
+            if ($result->attackerWon()) {
+                $this->questProgressService->incrementProgress($attacker, 'battle_pvp_win', 1);
+            } elseif ($result->defenderWon()) {
+                $this->questProgressService->incrementProgress($opponent, 'battle_pvp_win', 1);
+            }
+
             DB::commit();
 
+            // Generate success message
             $message = 'PvP battle completed! ';
-            if ($attackerRatingChange > 0) {
-                $message .= "You gained {$attackerRatingChange} rating!";
-            } elseif ($attackerRatingChange < 0) {
-                $message .= "You lost " . abs($attackerRatingChange) . " rating.";
+            $ratingChange = $ratings['attacker']['change'];
+            if ($ratingChange > 0) {
+                $message .= "You gained {$ratingChange} rating!";
+            } elseif ($ratingChange < 0) {
+                $message .= "You lost " . abs($ratingChange) . " rating.";
             } else {
                 $message .= "Draw - no rating change.";
             }

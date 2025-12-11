@@ -95,21 +95,56 @@
                                     </div>
                                 </div>
 
-                                <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                                    <div class="text-sm font-semibold mb-2">Required Energy</div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="text-sm">You have:</span>
-                                        <span class="font-bold {{ $userSectorEnergy >= $requirements['required_energy'] ? 'text-green-600' : 'text-red-600' }}">
-                                            {{ $userSectorEnergy }}
-                                        </span>
-                                    </div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="text-sm">Required:</span>
-                                        <span class="font-bold">{{ $requirements['required_energy'] }}</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                                        <div class="bg-green-600 h-2 rounded-full" style="width: {{ min(($userSectorEnergy / $requirements['required_energy']) * 100, 100) }}%"></div>
-                                    </div>
+                                <div class="bg-gray-50 p-4 rounded-lg mb-2">
+                                    <div class="text-sm font-semibold mb-3">Requirements</div>
+
+                                    @if ($requirements['required_generic_essence'] > 0)
+                                        <div class="mb-3">
+                                            <div class="text-xs text-gray-600 mb-1">Generic Essence</div>
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="text-xs">You have:</span>
+                                                <span class="text-sm font-bold {{ $userGenericEssence >= $requirements['required_generic_essence'] ? 'text-green-600' : 'text-red-600' }}">
+                                                    {{ $userGenericEssence }}
+                                                </span>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-xs">Required:</span>
+                                                <span class="text-sm font-bold">{{ $requirements['required_generic_essence'] }}</span>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    @if ($requirements['required_sector_essence'] > 0)
+                                        <div class="mb-3">
+                                            <div class="text-xs text-gray-600 mb-1">{{ $unit->sector->name }} Essence</div>
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="text-xs">You have:</span>
+                                                <span class="text-sm font-bold {{ $userSectorEssence >= $requirements['required_sector_essence'] ? 'text-green-600' : 'text-red-600' }}">
+                                                    {{ $userSectorEssence }}
+                                                </span>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-xs">Required:</span>
+                                                <span class="text-sm font-bold">{{ $requirements['required_sector_essence'] }}</span>
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    @if ($requirements['required_energy'] > 0)
+                                        <div>
+                                            <div class="text-xs text-gray-600 mb-1">{{ $unit->sector->name }} Energy</div>
+                                            <div class="flex justify-between items-center mb-1">
+                                                <span class="text-xs">You have:</span>
+                                                <span class="text-sm font-bold {{ $userSectorEnergy >= $requirements['required_energy'] ? 'text-green-600' : 'text-red-600' }}">
+                                                    {{ $userSectorEnergy }}
+                                                </span>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-xs">Required:</span>
+                                                <span class="text-sm font-bold">{{ $requirements['required_energy'] }}</span>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
 
                                 @if ($preview)
@@ -151,7 +186,7 @@
                                         @if ($canEvolve)
                                             Evolve Unit
                                         @else
-                                            Not Enough Energy
+                                            Insufficient Resources
                                         @endif
                                     </button>
                                 </form>

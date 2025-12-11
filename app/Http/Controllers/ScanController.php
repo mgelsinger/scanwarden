@@ -7,6 +7,7 @@ use App\Models\SectorEnergy;
 use App\Models\UserEssence;
 use App\Services\EssenceGenerationService;
 use App\Services\LoreService;
+use App\Services\QuestProgressService;
 use App\Services\ScanClassificationService;
 use App\Services\UnitSummoningService;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ class ScanController extends Controller
         private ScanClassificationService $classificationService,
         private UnitSummoningService $summoningService,
         private LoreService $loreService,
-        private EssenceGenerationService $essenceService
+        private EssenceGenerationService $essenceService,
+        private QuestProgressService $questProgressService
     ) {}
 
     public function create(): View
@@ -109,6 +111,11 @@ class ScanController extends Controller
 
             // Check and unlock any lore entries
             $this->loreService->checkAndUnlockLore($user);
+
+            // Increment quest progress for scans
+            $this->questProgressService->incrementProgress($user, 'scan', 1, [
+                'sector_id' => $sector->id,
+            ]);
 
             DB::commit();
 

@@ -24,6 +24,7 @@ class SummonedUnit extends Model
         'defense',
         'speed',
         'passive_ability',
+        'passive_key',
         'source',
     ];
 

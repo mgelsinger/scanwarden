@@ -80,6 +80,11 @@ class User extends Authenticatable
         return $this->hasMany(BattleMatch::class);
     }
 
+    public function userQuests(): HasMany
+    {
+        return $this->hasMany(UserQuest::class);
+    }
+
     public function unlockedLore(): BelongsToMany
     {
         return $this->belongsToMany(LoreEntry::class, 'user_lore_entries')

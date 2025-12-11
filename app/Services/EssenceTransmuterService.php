@@ -2,39 +2,40 @@
 
 namespace App\Services;
 
+use App\Exceptions\CannotAffordTransmutationException;
 use App\Models\TransmutationRecipe;
 use App\Models\User;
-use App\Models\UserEssence;
-use App\Models\SummonedUnit;
 use App\Models\TransmutationHistory;
 use Illuminate\Support\Facades\DB;
 
 class EssenceTransmuterService
 {
     public function __construct(
-        private UnitSummoningService $summoningService
+        private UnitSummoningService $summoningService,
+        private ResourceService $resourceService
     ) {}
 
     public function canAffordRecipe(User $user, TransmutationRecipe $recipe): bool
     {
         foreach ($recipe->required_inputs as $input) {
             if ($input['type'] === 'essence') {
-                $essence = UserEssence::where('user_id', $user->id)
-                    ->where('sector_id', $input['sector_id'] ?? null)
-                    ->where('type', $input['essence_type'] ?? 'generic')
-                    ->first();
+                $essenceType = $input['essence_type'] ?? 'generic';
 
-                if (!$essence || $essence->amount < $input['amount']) {
-                    return false;
+                if ($essenceType === 'generic') {
+                    if (!$this->resourceService->userHasGenericEssence($user, $input['amount'])) {
+                        return false;
+                    }
+                } else {
+                    // Sector-specific essence
+                    $sectorId = $input['sector_id'] ?? null;
+                    if (!$sectorId || !$this->resourceService->userHasSectorEssence($user, $sectorId, $input['amount'])) {
+                        return false;
+                    }
                 }
             }
 
             if ($input['type'] === 'sector_energy') {
-                $energy = $user->sectorEnergies()
-                    ->where('sector_id', $input['sector_id'])
-                    ->first();
-
-                if (!$energy || $energy->current_energy < $input['amount']) {
+                if (!$this->resourceService->userHasSectorEnergy($user, $input['sector_id'], $input['amount'])) {
                     return false;
                 }
             }
@@ -46,7 +47,7 @@ class EssenceTransmuterService
     public function transmute(User $user, TransmutationRecipe $recipe): array
     {
         if (!$this->canAffordRecipe($user, $recipe)) {
-            throw new \Exception('Insufficient resources for this transmutation.');
+            throw new CannotAffordTransmutationException('Insufficient resources for this transmutation.');
         }
 
         DB::beginTransaction();
@@ -56,21 +57,23 @@ class EssenceTransmuterService
             $inputsConsumed = [];
             foreach ($recipe->required_inputs as $input) {
                 if ($input['type'] === 'essence') {
-                    $essence = UserEssence::where('user_id', $user->id)
-                        ->where('sector_id', $input['sector_id'] ?? null)
-                        ->where('type', $input['essence_type'] ?? 'generic')
-                        ->firstOrFail();
+                    $essenceType = $input['essence_type'] ?? 'generic';
 
-                    $essence->decrement('amount', $input['amount']);
+                    if ($essenceType === 'generic') {
+                        $this->resourceService->deductGenericEssence($user, $input['amount']);
+                    } else {
+                        // Sector-specific essence
+                        $sectorId = $input['sector_id'] ?? null;
+                        if ($sectorId) {
+                            $this->resourceService->deductSectorEssence($user, $sectorId, $input['amount']);
+                        }
+                    }
+
                     $inputsConsumed[] = $input;
                 }
 
                 if ($input['type'] === 'sector_energy') {
-                    $energy = $user->sectorEnergies()
-                        ->where('sector_id', $input['sector_id'])
-                        ->firstOrFail();
-
-                    $energy->decrement('current_energy', $input['amount']);
+                    $this->resourceService->deductSectorEnergy($user, $input['sector_id'], $input['amount']);
                     $inputsConsumed[] = $input;
                 }
             }
@@ -79,13 +82,18 @@ class EssenceTransmuterService
             $outputsReceived = [];
             foreach ($recipe->outputs as $output) {
                 if ($output['type'] === 'essence') {
-                    $essence = UserEssence::firstOrCreate([
-                        'user_id' => $user->id,
-                        'sector_id' => $output['sector_id'] ?? null,
-                        'type' => $output['essence_type'] ?? 'generic',
-                    ], ['amount' => 0]);
+                    $essenceType = $output['essence_type'] ?? 'generic';
 
-                    $essence->increment('amount', $output['amount']);
+                    if ($essenceType === 'generic') {
+                        $this->resourceService->grantGenericEssence($user, $output['amount']);
+                    } else {
+                        // Sector-specific essence
+                        $sectorId = $output['sector_id'] ?? null;
+                        if ($sectorId) {
+                            $this->resourceService->grantSectorEssence($user, $sectorId, $output['amount']);
+                        }
+                    }
+
                     $outputsReceived[] = $output;
                 }
 
@@ -104,11 +112,7 @@ class EssenceTransmuterService
                 }
 
                 if ($output['type'] === 'sector_energy') {
-                    $energy = $user->sectorEnergies()->firstOrCreate([
-                        'sector_id' => $output['sector_id'],
-                    ], ['current_energy' => 0]);
-
-                    $energy->increment('current_energy', $output['amount']);
+                    $this->resourceService->grantSectorEnergy($user, $output['sector_id'], $output['amount']);
                     $outputsReceived[] = $output;
                 }
             }

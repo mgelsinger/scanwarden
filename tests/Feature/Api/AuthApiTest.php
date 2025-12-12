@@ -16,7 +16,7 @@ class AuthApiTest extends TestCase
     {
         $response = $this->postJson('/api/register', [
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            'email' => 'register-test@example.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
         ]);
@@ -28,19 +28,19 @@ class AuthApiTest extends TestCase
             ]);
 
         $this->assertDatabaseHas('users', [
-            'email' => 'test@example.com',
+            'email' => 'register-test@example.com',
         ]);
     }
 
     public function test_user_can_login_via_api(): void
     {
         $user = User::factory()->create([
-            'email' => 'test@example.com',
+            'email' => 'login-test@example.com',
             'password' => Hash::make('password123'),
         ]);
 
         $response = $this->postJson('/api/login', [
-            'email' => 'test@example.com',
+            'email' => 'login-test@example.com',
             'password' => 'password123',
         ]);
 
@@ -54,12 +54,12 @@ class AuthApiTest extends TestCase
     public function test_user_cannot_login_with_incorrect_password(): void
     {
         $user = User::factory()->create([
-            'email' => 'test@example.com',
+            'email' => 'incorrect-password-test@example.com',
             'password' => Hash::make('password123'),
         ]);
 
         $response = $this->postJson('/api/login', [
-            'email' => 'test@example.com',
+            'email' => 'incorrect-password-test@example.com',
             'password' => 'wrongpassword',
         ]);
 

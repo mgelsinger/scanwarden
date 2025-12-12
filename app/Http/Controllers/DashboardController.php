@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\UserTowerProgress;
 use App\Services\QuestProgressService;
 use App\Services\RatingService;
 use Illuminate\View\View;
@@ -59,12 +60,35 @@ class DashboardController extends Controller
             ->limit(3)
             ->get();
 
+        // Determine next action for onboarding
+        $hasTowerProgress = UserTowerProgress::where('user_id', $user->id)
+            ->where('highest_floor_cleared', '>', 0)
+            ->exists();
+
+        $nextAction = 'pvp_battle'; // default
+        if ($stats['total_scans'] === 0) {
+            $nextAction = 'scan_item';
+        } elseif ($stats['total_units'] > 0 && $stats['total_teams'] === 0) {
+            $nextAction = 'build_team';
+        } elseif ($stats['total_teams'] > 0 && !$hasTowerProgress) {
+            $nextAction = 'enter_tower';
+        }
+
+        $playerStatus = [
+            'total_scans' => $stats['total_scans'],
+            'total_units' => $stats['total_units'],
+            'total_teams' => $stats['total_teams'],
+            'has_tower_progress' => $hasTowerProgress,
+            'next_action' => $nextAction,
+        ];
+
         return view('dashboard', compact(
             'stats',
             'sectorEnergies',
             'recentUnits',
             'recentBattles',
-            'evolvableUnits'
+            'evolvableUnits',
+            'playerStatus'
         ));
     }
 }

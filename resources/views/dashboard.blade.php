@@ -13,6 +13,45 @@
                 <p class="text-blue-100">Continue your journey as a Scanner and discover the secrets of the UPC universe.</p>
             </div>
 
+            <!-- Onboarding / Next Steps -->
+            <x-card title="Next Steps" class="mb-6">
+                @php $s = $playerStatus; @endphp
+
+                @if($s['next_action'] === 'scan_item')
+                    <p class="text-sm text-gray-200">
+                        Start by scanning your first item. Every scan earns sector energy and can summon units.
+                    </p>
+                    <a href="{{ route('scan.create') }}" class="inline-flex mt-3 px-3 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-500 text-white">
+                        Go to Scan
+                    </a>
+                @elseif($s['next_action'] === 'build_team')
+                    <p class="text-sm text-gray-200">
+                        You've summoned units—now assemble your first team to enter battles and towers.
+                    </p>
+                    <a href="{{ route('teams.index') }}" class="inline-flex mt-3 px-3 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-500 text-white">
+                        Build a Team
+                    </a>
+                @elseif($s['next_action'] === 'enter_tower')
+                    <p class="text-sm text-gray-200">
+                        Test your team in a Sector Tower for guaranteed rewards and progression.
+                    </p>
+                    <a href="{{ route('towers.index') }}" class="inline-flex mt-3 px-3 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-500 text-white">
+                        Enter Towers
+                    </a>
+                @elseif($s['next_action'] === 'pvp_battle')
+                    <p class="text-sm text-gray-200">
+                        You're ready for PvP. Battle other players to climb the leaderboard.
+                    </p>
+                    <a href="{{ route('battles.index') }}" class="inline-flex mt-3 px-3 py-1.5 text-xs font-semibold rounded-md bg-indigo-600 hover:bg-indigo-500 text-white">
+                        Find a Battle
+                    </a>
+                @else
+                    <p class="text-sm text-gray-200">
+                        Keep scanning, evolving units, and climbing Towers to strengthen your roster.
+                    </p>
+                @endif
+            </x-card>
+
             <!-- Stats Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <!-- Total Scans -->

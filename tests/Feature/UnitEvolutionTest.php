@@ -15,6 +15,11 @@ class UnitEvolutionTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+    }
 
     /**
      * Helper to create a user with a starter unit (to bypass middleware)
@@ -211,7 +216,7 @@ class UnitEvolutionTest extends TestCase
         $response = $this->post(route('units.evolve', $unit));
 
         $response->assertRedirect(route('units.show', $unit));
-        $response->assertSessionHas('success');
+        $response->assertSessionHas('status');
 
         // Verify unit was evolved
         $unit->refresh();
@@ -244,7 +249,7 @@ class UnitEvolutionTest extends TestCase
         ]);
 
         // Create evolution rule
-        EvolutionRule::firstOrCreate(
+        EvolutionRule::updateOrCreate(
             ['from_tier' => 1, 'to_tier' => 2],
             [
             'required_sector_energy' => 50,
@@ -283,7 +288,7 @@ class UnitEvolutionTest extends TestCase
         $response = $this->post(route('units.evolve', $unit));
 
         $response->assertRedirect();
-        $response->assertSessionHasErrors();
+        $response->assertSessionHas('error');
 
         // Verify unit was NOT evolved
         $unit->refresh();
@@ -311,7 +316,7 @@ class UnitEvolutionTest extends TestCase
         ]);
 
         // Create evolution rule
-        EvolutionRule::firstOrCreate(
+        EvolutionRule::updateOrCreate(
             ['from_tier' => 1, 'to_tier' => 2],
             [
             'required_sector_energy' => 50,
@@ -350,7 +355,7 @@ class UnitEvolutionTest extends TestCase
         $response = $this->post(route('units.evolve', $unit));
 
         $response->assertRedirect();
-        $response->assertSessionHasErrors();
+        $response->assertSessionHas('error');
 
         // Verify unit was NOT evolved
         $unit->refresh();
@@ -378,7 +383,7 @@ class UnitEvolutionTest extends TestCase
         ]);
 
         // Create evolution rule
-        EvolutionRule::firstOrCreate(
+        EvolutionRule::updateOrCreate(
             ['from_tier' => 1, 'to_tier' => 2],
             [
             'required_sector_energy' => 100, // Needs 100
@@ -417,7 +422,7 @@ class UnitEvolutionTest extends TestCase
         $response = $this->post(route('units.evolve', $unit));
 
         $response->assertRedirect();
-        $response->assertSessionHasErrors();
+        $response->assertSessionHas('error');
 
         // Verify unit was NOT evolved
         $unit->refresh();
@@ -522,7 +527,7 @@ class UnitEvolutionTest extends TestCase
         ]);
 
         // Create evolution rules for multiple tiers
-        EvolutionRule::firstOrCreate(
+        EvolutionRule::updateOrCreate(
             ['from_tier' => 1, 'to_tier' => 2],
             [
                 'required_sector_energy' => 50,
@@ -535,7 +540,7 @@ class UnitEvolutionTest extends TestCase
             ]
         );
 
-        EvolutionRule::firstOrCreate(
+        EvolutionRule::updateOrCreate(
             ['from_tier' => 2, 'to_tier' => 3],
             [
             'required_sector_energy' => 100,
@@ -572,16 +577,14 @@ class UnitEvolutionTest extends TestCase
         $this->actingAs($user);
 
         // First evolution: Tier 1 -> 2
-        $this->from(route('units.show', $unit))
-            ->post(route('units.evolve', $unit));
+        $this->post(route('units.evolve', $unit));
         $unit->refresh();
         $this->assertEquals(2, $unit->tier);
         $this->assertEquals(1, $unit->evolution_level);
         $this->assertEquals(150, $unit->hp); // 100 * 1.5
 
         // Second evolution: Tier 2 -> 3
-        $this->from(route('units.show', $unit))
-            ->post(route('units.evolve', $unit));
+        $this->post(route('units.evolve', $unit));
         $unit->refresh();
         $this->assertEquals(3, $unit->tier);
         $this->assertEquals(2, $unit->evolution_level);

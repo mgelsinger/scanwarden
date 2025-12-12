@@ -93,8 +93,13 @@ class BattleMatchesController extends Controller
 
     public function show(BattleMatch $match): View
     {
-        // Authorization check
-        if ($match->user_id !== auth()->id()) {
+        $user = auth()->user();
+
+        // Authorization check - user must be attacker or defender
+        $isAttacker = $match->attacker_id === $user->id || $match->user_id === $user->id;
+        $isDefender = $match->defender_id === $user->id;
+
+        if (!$isAttacker && !$isDefender) {
             abort(403);
         }
 
@@ -104,7 +109,10 @@ class BattleMatchesController extends Controller
             'battleLogs'
         ]);
 
-        return view('battles.show', compact('match'));
+        // Determine perspective
+        $perspective = $isAttacker ? 'attacker' : 'defender';
+
+        return view('battles.show', compact('match', 'perspective'));
     }
 
     public function destroy(BattleMatch $match)

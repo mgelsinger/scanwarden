@@ -115,11 +115,11 @@ class UnitsController extends Controller
 
             return redirect()
                 ->route('units.show', $evolvedUnit)
-                ->with('success', "Unit evolved from Tier {$oldTier} to Tier {$evolvedUnit->tier}!");
+                ->with('status', "Your unit evolved! Now Tier {$evolvedUnit->tier}.");
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => $e->getMessage()]);
+            return back()->with('error', $e->getMessage());
         }
     }
 }

@@ -10,6 +10,15 @@ class BasicFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware([
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            \App\Http\Middleware\EnsureStarterSelected::class,
+        ]);
+    }
+
     public function test_dashboard_requires_authentication(): void
     {
         $response = $this->get('/dashboard');

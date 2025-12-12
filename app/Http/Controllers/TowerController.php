@@ -169,12 +169,12 @@ class TowerController extends Controller
 
                 return redirect()
                     ->route('towers.show', $tower)
-                    ->with('success', $message)
+                    ->with('status', $message)
                     ->with('tower_result', $flashData);
             } else {
                 return redirect()
                     ->route('towers.show', $tower)
-                    ->with('error', "Defeat! Try again to conquer floor {$stage->floor}.")
+                    ->with('error', "Defeated on floor {$stage->floor} – try upgrading your team.")
                     ->with('tower_result', $flashData);
             }
         });

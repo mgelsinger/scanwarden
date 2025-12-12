@@ -12,60 +12,31 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {{-- Success/Error Messages --}}
-            @if (session('success'))
-                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                    @if (session('tower_result') && session('tower_result')['first_clear'] && !empty(session('tower_result')['rewards']))
-                        <div class="mt-2">
-                            <strong>Rewards earned:</strong>
-                            @foreach (session('tower_result')['rewards'] as $reward)
-                                <span class="inline-block bg-green-200 px-2 py-1 rounded text-sm mr-2">
-                                    {{ $reward }}
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-            @endif
-
-            @if (session('error'))
-                <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                    <span class="block sm:inline">{{ session('error') }}</span>
-                </div>
-            @endif
-
             {{-- Tower Info --}}
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                <div class="p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h3 class="text-2xl font-bold mb-2">{{ $tower->name }}</h3>
-                            <p class="text-gray-600">{{ $tower->description }}</p>
-                        </div>
-                        <span class="px-4 py-2 rounded text-lg font-semibold"
-                              style="background-color: {{ $tower->sector->color }}; color: white;">
-                            {{ $tower->sector->name }}
-                        </span>
+            <x-card class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold mb-2 text-gray-100">{{ $tower->name }}</h3>
+                        <p class="text-gray-400 text-xs">{{ $tower->description }}</p>
                     </div>
-
-                    <div class="mt-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm font-medium text-gray-700">Your Progress</span>
-                            <span class="text-lg font-bold">Floor {{ $progress->highest_floor_cleared }} / {{ $tower->max_floor }}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3">
-                            <div class="bg-blue-600 h-3 rounded-full"
-                                 style="width: {{ ($progress->highest_floor_cleared / $tower->max_floor) * 100 }}%"></div>
-                        </div>
-                    </div>
+                    <x-badge variant="info">{{ $tower->sector->name }}</x-badge>
                 </div>
-            </div>
+
+                <div class="mt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-medium text-gray-300">Your Progress</span>
+                        <span class="text-sm font-bold text-gray-200">Floor {{ $progress->highest_floor_cleared }} / {{ $tower->max_floor }}</span>
+                    </div>
+                    <x-progress-bar
+                        :value="$progress->highest_floor_cleared"
+                        :max="$tower->max_floor"
+                    />
+                </div>
+            </x-card>
 
             {{-- Stages List --}}
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <h3 class="text-xl font-bold mb-4">Tower Floors</h3>
+            <x-card>
+                <h3 class="text-sm font-bold mb-4 text-gray-100">Tower Floors</h3>
 
                     <div class="space-y-4">
                         @forelse ($stages as $stageData)
@@ -76,43 +47,41 @@
                                 $cleared = $stageData['cleared'];
                             @endphp
 
-                            <div class="border rounded-lg p-4 {{ $locked ? 'bg-gray-100 opacity-60' : '' }} {{ $status === 'current' ? 'border-blue-500 border-2' : '' }}">
+                            <div class="border {{ $locked ? 'border-gray-700 opacity-60' : 'border-gray-600' }} {{ $status === 'current' ? 'border-indigo-500 border-2' : '' }} rounded-lg p-4 bg-gray-800/40">
                                 <div class="flex justify-between items-start">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-3 mb-2">
-                                            <h4 class="text-lg font-bold">Floor {{ $stage->floor }}</h4>
+                                            <h4 class="text-sm font-bold text-gray-100">Floor {{ $stage->floor }}</h4>
 
                                             @if ($cleared)
-                                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
-                                                    ✓ Cleared
-                                                </span>
+                                                <x-badge variant="success">✓ Cleared</x-badge>
                                             @elseif ($locked)
-                                                <span class="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs font-semibold">
-                                                    🔒 Locked
-                                                </span>
+                                                <x-badge variant="default">🔒 Locked</x-badge>
                                             @else
-                                                <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
-                                                    Available
-                                                </span>
+                                                <x-badge variant="info">Available</x-badge>
                                             @endif
                                         </div>
 
-                                        <div class="text-sm text-gray-600 mb-2">
+                                        <div class="text-xs text-gray-400 mb-2">
                                             <strong>Recommended Power:</strong> {{ $stage->recommended_power }}
                                         </div>
 
                                         @if ($stage->rewards)
-                                            <div class="text-sm text-gray-600">
+                                            <div class="text-xs text-gray-400">
                                                 <strong>First Clear Rewards:</strong>
-                                                @foreach ($stage->rewards as $reward)
-                                                    <span class="inline-block bg-gray-200 px-2 py-1 rounded text-xs mr-1">
+                                                <div class="flex flex-wrap gap-1 mt-1">
+                                                    @foreach ($stage->rewards as $reward)
                                                         @if ($reward['type'] === 'essence')
-                                                            {{ ucfirst($reward['essence_type']) }} Essence: {{ $reward['amount'] }}
+                                                            <x-badge variant="info">
+                                                                {{ ucfirst($reward['essence_type']) }} Essence: {{ $reward['amount'] }}
+                                                            </x-badge>
                                                         @elseif ($reward['type'] === 'sector_energy')
-                                                            Energy: {{ $reward['amount'] }}
+                                                            <x-badge variant="info">
+                                                                Energy: {{ $reward['amount'] }}
+                                                            </x-badge>
                                                         @endif
-                                                    </span>
-                                                @endforeach
+                                                    @endforeach
+                                                </div>
                                             </div>
                                         @endif
                                     </div>
@@ -145,13 +114,12 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="text-center text-gray-500 py-8">
-                                <p>No floors available for this tower.</p>
+                            <div class="text-center text-gray-400 py-8">
+                                <p class="text-sm">No floors available for this tower.</p>
                             </div>
                         @endforelse
                     </div>
-                </div>
-            </div>
+            </x-card>
         </div>
     </div>
 </x-app-layout>
